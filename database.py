@@ -23,7 +23,8 @@ class Game(db.Model):
     name = db.Column(db.String(100), nullable=False)
     max_players = db.Column(db.Integer, nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    started = db.Column(db.Boolean, default=False)
+    players = db.relationship('Player', backref='game', lazy=True)  # Relation avec Player
 
     # Relation avec les joueurs
     players = db.relationship('Player', backref='game', lazy=True)
