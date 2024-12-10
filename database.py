@@ -52,3 +52,15 @@ def assign_roles(players):
     
     return assigned_roles
 
+
+
+class Message(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    content = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    game_id = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=False)
+
+    # Relations
+    user = db.relationship('User', backref=db.backref('messages', lazy=True))
+    game = db.relationship('Game', backref=db.backref('messages', lazy=True))

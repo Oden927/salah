@@ -44,7 +44,7 @@
         const messagesDiv = document.getElementById('messages');
         socket.on('message', (data) => {
             const msg = document.createElement('div');
-            msg.textContent = data;
+            msg.textContent = `[${data.timestamp}] ${data.username}: ${data.message}`;
             messagesDiv.appendChild(msg);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;  // Scroll automatique
         });
@@ -56,4 +56,3 @@
     </script>
 </body>
 </html>
-
