@@ -4,15 +4,15 @@ from flask_migrate import Migrate
 from database import db, User, Game , Player , assign_roles # Importer la base de données et les modèles
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer
-from flask_socketio import SocketIO, join_room, leave_room, send, emit
-from datetime import datetime
+from flask_socketio import SocketIO, join_room, leave_room, send
+
 import os
 
 
 
 app = Flask(__name__)
 app.secret_key = 'votre_cle_secrete'  # Utilisez une clé secrète sécurisée
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app)
 
 
 
@@ -270,16 +270,6 @@ def join_game():
         new_player = Player(user_id=session['user_id'], game_id=game_id)
         db.session.add(new_player)
         db.session.commit()
-            # Charger les messages existants
-        messages = Message.query.filter_by(game_id=game_id).order_by(Message.timestamp).all()
-        formatted_messages = [{
-            'user_id': msg.user_id,
-            'content': msg.content,
-            'timestamp': msg.timestamp.strftime('%Y-%m-%d %H:%M:%S')
-        } for msg in messages]
-
-        # Envoyer les messages existants au nouvel utilisateur
-        emit('load_messages', formatted_messages)
 
         # Si la partie est maintenant complète, redirigez vers la page du jeu
         if len(game.players) >= game.max_players:
@@ -301,7 +291,25 @@ def waiting_room(game_id):
 
     return render_template('waiting_room.html', game_id=game_id, username=session.get('username'))
 
+# Gestion des messages en temps réel avec SocketIO
+@socketio.on('join')
+def handle_join(data):
+    username = data['username']
+    room = data['room']
+    join_room(room)
+    send(f"{username} a rejoint la salle.", to=room)
 
+@socketio.on('message')
+def handle_message(data):
+    room = data['room']
+    send(f"{data['username']}: {data['message']}", to=room)
+
+@socketio.on('leave')
+def handle_leave(data):
+    username = data['username']
+    room = data['room']
+    leave_room(room)
+    send(f"{username} a quitté la salle.", to=room)
 
 
 @app.route('/game/<int:game_id>', methods=['GET', 'POST'])
@@ -320,27 +328,6 @@ def game_page(game_id):
     roles = assign_roles(players)
 
     return render_template('game.html', game=game, roles=roles)
-
-
-@socketio.on('send_message')
-def handle_send_message(data):
-    game_id = data['game_id']
-    user_id = data['user_id']
-    content = data['content']
-
-    # Enregistrer le message dans la base de données
-    new_message = Message(content=content, user_id=user_id, game_id=game_id)
-    db.session.add(new_message)
-    db.session.commit()
-
-    # Envoyer le message à tous les clients de la salle
-    room = f"game_{game_id}"
-    emit('receive_message', {
-        'user_id': user_id,
-        'content': content,
-        'timestamp': new_message.timestamp.strftime('%Y-%m-%d %H:%M:%S')
-    }, to=room)
-
 
 
 if __name__ == '__main__':
