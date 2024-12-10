@@ -1,0 +1,39 @@
+@app.route('/join_game', methods=['GET', 'POST'])
+def join_game():
+    if 'user_id' not in session:
+        flash("Veuillez vous connecter pour rejoindre une partie.", "danger")
+        return redirect(url_for('login'))
+
+    games = Game.query.all()  # Récupérer toutes les parties
+
+    if request.method == 'POST':
+        game_id = request.form.get('game_id')
+        game = Game.query.get(game_id)
+
+        if not game:
+            flash("Cette partie n'existe pas.", "danger")
+            return redirect(url_for('join_game'))
+
+        # Vérifier si la partie est complète
+        if len(game.players) >= game.max_players:
+            return redirect(url_for('game_page', game_id=game_id))
+
+        # Vérifier si le joueur est déjà inscrit
+        existing_player = Player.query.filter_by(user_id=session['user_id'], game_id=game_id).first()
+        if existing_player:
+            flash("Vous avez déjà rejoint cette partie.", "info")
+            return redirect(url_for('join_game'))
+
+        # Ajouter le joueur à la partie
+        new_player = Player(user_id=session['user_id'], game_id=game_id)
+        db.session.add(new_player)
+        db.session.commit()
+
+        # Si la partie est maintenant complète, redirigez vers la page du jeu
+        if len(game.players) >= game.max_players:
+            return redirect(url_for('game_page', game_id=game_id))
+
+        flash(f"Vous avez rejoint la partie '{game.name}' !", "success")
+        return redirect(url_for('home'))
+
+    return render_template('join_game.html', games=games)

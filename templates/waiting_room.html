@@ -20,10 +20,15 @@
         <h1>Salle d'attente - Partie {{ game_id }}</h1>
         <div id="messages" class="messages-container">
             <!-- Les messages s'afficheront ici -->
-        </div>
-        <input type="text" id="message-box" placeholder="Tapez votre message..." class="message-input">
-        <button id="send" class="auth-button">Envoyer</button>
-    </div>
+            <div id="messages">
+                {% for msg in messages %}
+                    <div class="message">
+                        <strong>{{ msg.user.username }}</strong> : {{ msg.content }}
+                        <span class="timestamp">{{ msg.timestamp.strftime('%H:%M:%S') }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+            
 
     <script>
         const socket = io();
