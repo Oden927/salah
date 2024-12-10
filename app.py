@@ -345,6 +345,41 @@ def game_page(game_id):
 
     return render_template('game.html', game=game, roles=roles)
 
+votes = {}  # Dictionnaire pour stocker les votes
+
+@socketio.on('vote')
+def handle_vote(data):
+    voted_user_id = data.get('votedUserId')
+    room = data.get('room')
+
+    if room not in votes:
+        votes[room] = {}
+
+    if voted_user_id in votes[room]:
+        votes[room][voted_user_id] += 1
+    else:
+        votes[room][voted_user_id] = 1
+
+    # Vérifiez si tous les joueurs ont voté
+    game = Game.query.filter_by(id=room).first()
+    if len(votes[room]) == len(game.players):
+        # Trouver le joueur avec le plus de votes
+        eliminated_player_id = max(votes[room], key=votes[room].get)
+        eliminated_player = User.query.get(eliminated_player_id)
+
+        # Supprimez le joueur de la partie
+        Player.query.filter_by(user_id=eliminated_player_id, game_id=room).delete()
+        db.session.commit()
+
+        # Notifiez tous les joueurs de l'élimination
+        socketio.emit('vote_result', {
+            'eliminatedPlayer': eliminated_player.username
+        }, room=room)
+
+        # Réinitialisez les votes
+        votes[room] = {}
+
+
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)

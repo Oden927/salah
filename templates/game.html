@@ -6,50 +6,120 @@
     <title>Jeu en cours - Partie {{ game.name }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 </head>
 <body>
     <div class="content">
         <h1>Partie {{ game.name }}</h1>
         <p>Rôle attribué : {{ roles | selectattr('player_id', 'equalto', session['user_id']) | map(attribute='role') | first }}</p>
-        <div id="chat">
-            <h2>Chat</h2>
-            <div id="messages" style="border: 1px solid #ddd; padding: 10px; height: 300px; overflow-y: scroll; background: #f4f4f4; margin-bottom: 10px;">
-                <!-- Messages s'afficheront ici -->
+
+        <!-- Minuteur -->
+        <p id="timer">Temps restant : 5:00</p>
+
+        <!-- Chat pour la discussion -->
+        <div id="chat" class="chat-container">
+            <h2>Discussion</h2>
+            <div id="messages" class="messages-container">
+                <!-- Les messages s'afficheront ici -->
             </div>
-            <input type="text" id="message-box" placeholder="Tapez votre message..." style="width: 80%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            <input type="text" id="message-box" placeholder="Tapez votre message..." class="message-input">
             <button id="send" class="auth-button">Envoyer</button>
+        </div>
+
+        <!-- Section de vote -->
+        <div id="voting" style="display: none;">
+            <h2>Votez pour éliminer un joueur</h2>
+            <div id="voting-options">
+                <!-- Les options de vote seront générées ici -->
+            </div>
         </div>
     </div>
 
     <script>
         const socket = io();
 
-        // Rejoindre la salle
         const username = "{{ session['username'] }}";
         const room = "game_{{ game.id }}";
+        let discussionTime = 300; // 5 minutes
+
+        // Rejoindre la salle
         socket.emit('join', { username: username, room: room });
 
         // Envoyer un message
         const sendButton = document.getElementById('send');
         const messageBox = document.getElementById('message-box');
+        const messagesDiv = document.getElementById('messages');
+
         sendButton.addEventListener('click', () => {
-            const message = messageBox.value;
-            if (message.trim()) {
+            const message = messageBox.value.trim();
+            if (message) {
                 socket.emit('message', { username: username, message: message, room: room });
                 messageBox.value = '';
             }
         });
 
         // Afficher les messages
-        const messagesDiv = document.getElementById('messages');
         socket.on('message', (data) => {
             const msg = document.createElement('div');
-            msg.textContent = `[${data.timestamp}] ${data.username}: ${data.message}`;
+            msg.classList.add('message-block');
+            msg.innerHTML = `
+                <div class="message-header">
+                    <strong>${data.username || "Utilisateur inconnu"}</strong>
+                    <span>${data.timestamp || new Date().toLocaleTimeString()}</span>
+                </div>
+                <div class="message-content">${data.message || "Message non disponible"}</div>
+            `;
             messagesDiv.appendChild(msg);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;  // Scroll automatique
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
         });
+
+        // Minuteur de discussion
+        function startDiscussion() {
+            const timerDisplay = document.getElementById('timer');
+            const timerInterval = setInterval(() => {
+                const minutes = Math.floor(discussionTime / 60);
+                const seconds = discussionTime % 60;
+                timerDisplay.textContent = `Temps restant : ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                discussionTime--;
+
+                if (discussionTime < 0) {
+                    clearInterval(timerInterval);
+                    startVoting();
+                }
+            }, 1000);
+        }
+
+        // Phase de vote
+        function startVoting() {
+            document.getElementById('chat').style.display = 'none';
+            document.getElementById('voting').style.display = 'block';
+
+            const votingOptions = document.getElementById('voting-options');
+            votingOptions.innerHTML = '';
+
+            const players = JSON.parse('{{ players | tojson | safe }}');
+            players.forEach(player => {
+                const voteButton = document.createElement('button');
+                voteButton.textContent = player.username;
+                voteButton.classList.add('vote-button');
+                voteButton.addEventListener('click', () => castVote(player.user_id));
+                votingOptions.appendChild(voteButton);
+            });
+        }
+
+        // Soumettre un vote
+        function castVote(votedUserId) {
+            socket.emit('vote', { votedUserId: votedUserId, room: room });
+        }
+
+        // Écouter le résultat du vote
+        socket.on('vote_result', (data) => {
+            alert(`${data.eliminatedPlayer} a été éliminé !`);
+            location.reload(); // Recharge la page pour continuer
+        });
+
+        // Lancer la discussion
+        startDiscussion();
     </script>
 </body>
 </html>
