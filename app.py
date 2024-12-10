@@ -5,7 +5,8 @@ from database import db, User, Game , Player , assign_roles # Importer la base d
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer
 from flask_socketio import SocketIO, join_room, leave_room, send
-
+from flask_socketio import emit
+from datetime import datetime
 import os
 
 
@@ -299,10 +300,25 @@ def handle_join(data):
     join_room(room)
     send(f"{username} a rejoint la salle.", to=room)
 
+
 @socketio.on('message')
 def handle_message(data):
-    room = data['room']
-    send(f"{data['username']}: {data['message']}", to=room)
+    print("Données reçues du client :", data)  # Vérifiez les données envoyées par le client
+
+    # Données attendues
+    username = data.get('username', 'Utilisateur inconnu')
+    message = data.get('message', 'Message non disponible')
+    room = data.get('room', None)
+
+    if room:
+        emit('message', {
+            'username': username,
+            'message': message,
+            'timestamp': datetime.now().strftime('%H:%M:%S')
+        }, room=room)
+    else:
+        print("Erreur : room non spécifié.")
+
 
 @socketio.on('leave')
 def handle_leave(data):
