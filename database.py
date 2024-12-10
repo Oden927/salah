@@ -39,3 +39,16 @@ class Player(db.Model):
 
     def __repr__(self):
         return f'<Player User: {self.user_id} in Game: {self.game_id}>'
+    
+import random
+
+def assign_roles(players):
+    roles = ['Loup-Garou', 'Voyante', 'Villageois']  # Exemple de rôles
+    role_distribution = random.choices(roles, k=len(players))
+    
+    assigned_roles = []
+    for player, role in zip(players, role_distribution):
+        assigned_roles.append({'player_id': player.user_id, 'role': role})
+    
+    return assigned_roles
+

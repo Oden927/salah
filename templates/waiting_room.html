@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salle d'attente</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="navbar">
+        <div class="logo">Loup-Garou</div>
+        <div class="nav-links">
+            <a href="{{ url_for('home') }}">Accueil</a>
+            <a href="{{ url_for('logout') }}" class="auth-button">Déconnexion</a>
+        </div>
+    </div>
+
+    <div class="content">
+        <h1>Salle d'attente - Partie {{ game_id }}</h1>
+        <div id="messages" style="border: 1px solid #ddd; padding: 10px; height: 300px; overflow-y: scroll; background: #f4f4f4; margin-bottom: 10px;">
+            <!-- Les messages s'affichent ici -->
+        </div>
+        <input type="text" id="message-box" placeholder="Tapez votre message..." style="width: 80%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 5px;">
+        <button id="send" class="auth-button">Envoyer</button>
+    </div>
+
+    <script>
+        const socket = io();
+
+        // Rejoindre la salle
+        const username = "{{ username }}";
+        const room = "game_{{ game_id }}";
+        socket.emit('join', { username: username, room: room });
+
+        // Envoyer un message
+        const sendButton = document.getElementById('send');
+        const messageBox = document.getElementById('message-box');
+        sendButton.addEventListener('click', () => {
+            const message = messageBox.value;
+            if (message.trim()) {
+                socket.emit('message', { username: username, message: message, room: room });
+                messageBox.value = '';
+            }
+        });
+
+        // Afficher les messages
+        const messagesDiv = document.getElementById('messages');
+        socket.on('message', (data) => {
+            const msg = document.createElement('div');
+            msg.textContent = data;
+            messagesDiv.appendChild(msg);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;  // Scroll automatique
+        });
+
+        // Gérer la fermeture
+        window.addEventListener('beforeunload', () => {
+            socket.emit('leave', { username: username, room: room });
+        });
+    </script>
+</body>
+</html>

@@ -19,18 +19,23 @@
             {% endif %}
         {% endwith %}
         <ul>
-            {% for game in games %}
-                <li>
-                    <strong>{{ game.name }}</strong> - {{ game.max_players }} joueurs max
-                    <p>{{ game.players|length }} joueur(s) ont rejoint cette partie</p>
-                    <form method="POST" style="display:inline;">
-                        <input type="hidden" name="game_id" value="{{ game.id }}">
-                        <button type="submit" {% if game.players|length >= game.max_players %}disabled{% endif %}>
-                            Rejoindre
-                        </button>
-                    </form>
-                </li>
-            {% endfor %}
+            {% if games %}
+                {% for game in games %}
+                    <li>
+                        <strong>{{ game.name }}</strong> - {{ game.max_players }} joueurs max
+                        <p>{{ game.players|length if game.players else 0 }} joueur(s) ont rejoint cette partie</p>
+                        <form method="POST" style="display:inline;">
+                            <input type="hidden" name="game_id" value="{{ game.id }}">
+                            <button type="submit" {% if game.players|length >= game.max_players %}disabled{% endif %}>
+                                Rejoindre
+                            </button>
+                        </form>
+                        <a href="{{ url_for('waiting_room', game_id=game.id) }}" class="button">Salle d'attente</a>
+                    </li>
+                {% endfor %}
+            {% else %}
+                <p>Aucune partie disponible pour le moment. Créez-en une !</p>
+            {% endif %}
         </ul>
         <p style="text-align: center; margin-top: 10px;">
             <a href="{{ url_for('home') }}" style="color: #007bff; text-decoration: none;">Retour à l'accueil</a>

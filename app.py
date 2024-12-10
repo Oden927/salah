@@ -1,16 +1,20 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, session, redirect, url_for, request, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from database import db, User, Game , Player# Importer la base de données et les modèles
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer
+from flask_socketio import SocketIO, join_room, leave_room, send
 
 import os
 
 
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key"
+app.secret_key = 'votre_cle_secrete'  # Utilisez une clé secrète sécurisée
+socketio = SocketIO(app)
+
+
 
 # Configurer Flask-Mail
 app.config['MAIL_SERVER'] = 'smtp.sendgrid.net'
@@ -242,32 +246,92 @@ def join_game():
         flash("Veuillez vous connecter pour rejoindre une partie.", "danger")
         return redirect(url_for('login'))
 
-    # Récupérer toutes les parties disponibles avec leurs joueurs
-    games = Game.query.all()
+    games = Game.query.all()  # Récupérer toutes les parties
 
     if request.method == 'POST':
         game_id = request.form.get('game_id')
         game = Game.query.get(game_id)
 
-        # Vérifier si la partie existe et si le joueur n'est pas déjà inscrit
         if not game:
             flash("Cette partie n'existe pas.", "danger")
             return redirect(url_for('join_game'))
 
+        # Vérifier si la partie est complète
+        if len(game.players) >= game.max_players:
+            return redirect(url_for('game_page', game_id=game_id))
+
+        # Vérifier si le joueur est déjà inscrit
         existing_player = Player.query.filter_by(user_id=session['user_id'], game_id=game_id).first()
         if existing_player:
             flash("Vous avez déjà rejoint cette partie.", "info")
             return redirect(url_for('join_game'))
 
-        # Ajouter l'utilisateur en tant que joueur
+        # Ajouter le joueur à la partie
         new_player = Player(user_id=session['user_id'], game_id=game_id)
         db.session.add(new_player)
         db.session.commit()
+
+        # Si la partie est maintenant complète, redirigez vers la page du jeu
+        if len(game.players) >= game.max_players:
+            return redirect(url_for('game_page', game_id=game_id))
 
         flash(f"Vous avez rejoint la partie '{game.name}' !", "success")
         return redirect(url_for('home'))
 
     return render_template('join_game.html', games=games)
+
+
+
+# Exemple de route pour la salle d'attente
+@app.route('/waiting_room/<int:game_id>', methods=['GET'])
+def waiting_room(game_id):
+    if 'user_id' not in session:
+        flash("Veuillez vous connecter pour rejoindre une salle d'attente.", "danger")
+        return redirect(url_for('login'))
+
+    return render_template('waiting_room.html', game_id=game_id, username=session.get('username'))
+
+# Gestion des messages en temps réel avec SocketIO
+@socketio.on('join')
+def handle_join(data):
+    username = data['username']
+    room = data['room']
+    join_room(room)
+    send(f"{username} a rejoint la salle.", to=room)
+
+@socketio.on('message')
+def handle_message(data):
+    room = data['room']
+    send(f"{data['username']}: {data['message']}", to=room)
+
+@socketio.on('leave')
+def handle_leave(data):
+    username = data['username']
+    room = data['room']
+    leave_room(room)
+    send(f"{username} a quitté la salle.", to=room)
+
+
+@app.route('/game/<int:game_id>', methods=['GET', 'POST'])
+def game_page(game_id):
+    game = Game.query.get(game_id)
+    if not game:
+        flash("Cette partie n'existe pas.", "danger")
+        return redirect(url_for('join_game'))
+
+    if len(game.players) < game.max_players:
+        flash("La partie n'est pas encore complète.", "warning")
+        return redirect(url_for('join_game'))
+
+    # Attribution des rôles
+    players = game.players
+    roles = assign_roles(players)
+
+    return render_template('game.html', game=game, roles=roles)
+
+
+if __name__ == '__main__':
+    socketio.run(app, debug=True)
 
 
 
