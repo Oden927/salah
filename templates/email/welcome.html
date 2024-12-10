@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bienvenue</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .email-header {
+            background-color: #4CAF50;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            font-size: 24px;
+        }
+        .email-body {
+            padding: 20px;
+            color: #333333;
+        }
+        .email-body p {
+            margin: 10px 0;
+        }
+        .email-footer {
+            background-color: #f1f1f1;
+            text-align: center;
+            padding: 10px;
+            font-size: 12px;
+            color: #555555;
+        }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 20px 0;
+            font-size: 16px;
+            color: white;
+            background-color: #4CAF50;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            Bienvenue sur Loup-Garou
+        </div>
+        <div class="email-body">
+            <p>Bonjour {{ username }},</p>
+            <p>Nous sommes ravis de vous compter parmi nous ! Votre compte a été créé avec succès.</p>
+            <p>Pour commencer à jouer et rejoindre vos amis dans des parties palpitantes, connectez-vous dès maintenant :</p>
+            <a href="https://votre-site.com/login" class="button">Se connecter</a>
+            <p>Si vous avez des questions, n’hésitez pas à nous contacter.</p>
+            <p>Amicalement,<br>L'équipe Loup-Garou</p>
+        </div>
+        <div class="email-footer">
+            © 2024 Loup-Garou. Tous droits réservés.
+        </div>
+    </div>
+</body>
+</html>

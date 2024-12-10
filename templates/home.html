@@ -1,0 +1,58 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loup-Garou</title>
+    <!-- Lien vers le fichier CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Barre de navigation -->
+    <div class="navbar">
+        <div class="logo">Loup-Garou</div>
+        <div class="nav-links">
+            <a href="#home">Accueil</a>
+            <a href="#about">À propos</a>
+            <a href="#rules">Règles</a>
+        </div>
+        {% if session.get('username') %}
+            <!-- Afficher le pseudo de l'utilisateur connecté -->
+            <span>Bienvenue, {{ session.get('username') }} !</span>
+            <a href="{{ url_for('logout') }}" class="auth-button">Déconnexion</a>
+        {% else %}
+            <!-- Afficher Connexion/Inscription si l'utilisateur n'est pas connecté -->
+            <a href="{{ url_for('login') }}" class="auth-button">Connexion/Inscription</a>
+        {% endif %}
+    </div>
+    
+    <!-- Contenu principal -->
+    <div class="content">
+        <<div class="content">
+            <h1>Bienvenue sur Loup-Garou</h1>
+            <div class="content">
+                <h1>Bienvenue sur Loup-Garou</h1>
+                {% if session.get('username') %}
+                    <p>Bonjour {{ session.get('username') }} !</p>
+                    <a href="{{ url_for('create_game') }}" class="button">Créer une partie</a>
+                    <a href="{{ url_for('join_game') }}" class="button">Rejoindre une partie</a>
+                {% else %}
+                    <p>Veuillez vous connecter pour accéder aux parties.</p>
+                    <a href="{{ url_for('login') }}" class="button">Connexion</a>
+                {% endif %}
+            </div> 
+        </div>
+    </div>
+</body>
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <div>
+            {% for category, message in messages %}
+                <p class="alert {{ category }}">{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
+
+</html>

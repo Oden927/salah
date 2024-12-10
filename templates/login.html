@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="content">
+        <h1>Connexion</h1>
+        {% if error %}
+        <p style="color: red;">{{ error }}</p>
+        {% endif %}
+    
+        <form method="POST">
+            <label for="identifier">Nom d'utilisateur ou Email :</label>
+            <input type="text" id="identifier" name="identifier" required><br>
+        
+            <label for="password">Mot de passe :</label>
+            <input type="password" id="password" name="password" required><br>
+        
+            <button type="submit">Se connecter</button>
+            <p style="text-align: center; margin-top: 10px;">
+                <a href="{{ url_for('forgot') }}" style="color: #007bff; text-decoration: none;">
+                    Mot de passe ou identifiant oublié ?
+                </a>
+            </p>
+            
+        </form>
+        
+        <p>Pas encore inscrit ? <a href="/register">Créer un compte</a></p>
+    </div>
+</body>
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <div>
+            {% for category, message in messages %}
+                <p class="alert {{ category }}">{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
+
+</html>

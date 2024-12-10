@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rejoindre une partie</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="content">
+        <h1>Rejoindre une partie</h1>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div>
+                    {% for category, message in messages %}
+                        <p class="alert {{ category }}">{{ message }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        <ul>
+            {% for game in games %}
+                <li>
+                    <strong>{{ game.name }}</strong> - {{ game.max_players }} joueurs max
+                    <p>{{ game.players|length }} joueur(s) ont rejoint cette partie</p>
+                    <form method="POST" style="display:inline;">
+                        <input type="hidden" name="game_id" value="{{ game.id }}">
+                        <button type="submit" {% if game.players|length >= game.max_players %}disabled{% endif %}>
+                            Rejoindre
+                        </button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+        <p style="text-align: center; margin-top: 10px;">
+            <a href="{{ url_for('home') }}" style="color: #007bff; text-decoration: none;">Retour à l'accueil</a>
+        </p>
+    </div>
+</body>
+</html>
