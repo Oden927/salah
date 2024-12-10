@@ -1,0 +1,10 @@
+from flask import Flask, render_template
+
+app = Flask(__name__)  # Initialiser l'application Flask
+
+@app.route('/')  # Route pour la page d'accueil
+def home():
+    return render_template('home.html')  # Rendre un template HTML
+
+if __name__ == '__main__':
+    app.run(debug=True)  # Lancer l'application en mode debug
