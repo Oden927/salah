@@ -7,6 +7,8 @@
     <title>Loup-Garou</title>
     <!-- Lien vers le fichier CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+
 </head>
 <body>
     <!-- Barre de navigation -->
@@ -29,9 +31,6 @@
     
     <!-- Contenu principal -->
     <div class="content">
-        <<div class="content">
-            <h1>Bienvenue sur Loup-Garou</h1>
-            <div class="content">
                 <h1>Bienvenue sur Loup-Garou</h1>
                 {% if session.get('username') %}
                     <p>Bonjour {{ session.get('username') }} !</p>
@@ -41,8 +40,6 @@
                     <p>Veuillez vous connecter pour accéder aux parties.</p>
                     <a href="{{ url_for('login') }}" class="button">Connexion</a>
                 {% endif %}
-            </div> 
-        </div>
     </div>
 </body>
 {% with messages = get_flashed_messages(with_categories=true) %}

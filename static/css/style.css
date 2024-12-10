@@ -1,9 +1,10 @@
 /* Styles généraux */
 body {
     margin: 0;
-    font-family: Arial, sans-serif;
+    font-family: 'Cinzel', serif; /* Police manuscrite */
     line-height: 1.6;
-    background-color: #f9f9f9;
+    background: linear-gradient(180deg, #111 0%, #222 100%);
+    color: #e5e5e5;
 }
 
 /* Barre de navigation */
@@ -11,14 +12,16 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background-color: #333;
-    color: white;
+    background-color: #1a1a1a;
+    color: #f1c40f;
     padding: 15px 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
 }
 
 .navbar .logo {
-    font-size: 20px;
+    font-size: 24px;
     font-weight: bold;
+    color: #f39c12;
 }
 
 .navbar .nav-links {
@@ -27,14 +30,15 @@ body {
 }
 
 .navbar .nav-links a {
-    color: white;
+    color: #f1c40f;
     text-decoration: none;
     padding: 5px 10px;
     border-radius: 5px;
 }
 
 .navbar .nav-links a:hover {
-    background-color: #555;
+    background-color: #f39c12;
+    color: black;
 }
 
 /* Conteneur principal */
@@ -43,22 +47,25 @@ body {
     padding: 20px;
     width: 90%;
     max-width: 800px;
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    background: rgba(20, 20, 20, 0.8);
+    border: 1px solid #444;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
 }
 
 .content h1 {
-    font-size: 2rem;
+    font-size: 2.5rem;
     margin-bottom: 20px;
-    color: #333;
+    color: #f39c12;
     text-align: center;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 .content p {
     font-size: 1rem;
-    color: #555;
-    line-height: 1.5;
+    color: #ddd;
+    line-height: 1.8;
     text-align: center;
 }
 
@@ -67,15 +74,17 @@ body {
     margin: 10px auto;
     padding: 10px 20px;
     font-size: 1rem;
-    background-color: #007bff;
-    color: white;
+    background: #f39c12;
+    color: black;
     border: none;
     border-radius: 5px;
     cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.6);
 }
 
 .content button:hover {
-    background-color: #0056b3;
+    background-color: #d35400;
+    color: white;
 }
 
 /* Alertes */
@@ -114,15 +123,16 @@ li {
 .button {
     display: inline-block;
     padding: 10px 15px;
-    color: white;
-    background-color: #007bff;
+    color: black;
+    background-color: #f39c12;
     text-decoration: none;
     border-radius: 5px;
     margin: 5px;
 }
 
 .button:hover {
-    background-color: #0056b3;
+    background-color: #d35400;
+    color: white;
 }
 
 /* Formulaires */
@@ -138,23 +148,36 @@ form input[type="password"] {
     width: 100%;
     padding: 10px;
     margin: 10px 0;
-    border: 1px solid #ccc;
+    border: 1px solid #555;
+    background: #1a1a1a;
+    color: #ddd;
     border-radius: 5px;
 }
 
 form button {
     width: 100%;
     padding: 10px;
-    background-color: #007bff;
-    color: white;
+    background: #f39c12;
+    color: black;
     border: none;
     border-radius: 5px;
     cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.6);
 }
 
 form button:hover {
-    background-color: #0056b3;
+    background-color: #d35400;
+    color: white;
 }
+
+/* Chat */
+#chat {
+    background: rgba(0, 0, 0, 0.7);
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid #555;
+}
+
 
 /* Média Queries */
 
@@ -184,7 +207,7 @@ form button:hover {
     }
 
     .content h1 {
-        font-size: 1.8rem;
+        font-size: 2rem;
     }
 }
 
@@ -236,4 +259,123 @@ form button:hover {
     .navbar .nav-links a {
         font-size: 0.9rem;
     }
+}
+
+
+/* Messages de l'utilisateur actuel */
+.message.user {
+    background: rgba(80, 80, 80, 0.9);
+    color: #fff;
+    border: 1px solid #555;
+}
+
+/* Effet au survol */
+.message:hover {
+    background: rgba(70, 70, 70, 0.9);
+    transform: scale(1.01);
+}
+
+/* Animation d'apparition */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Conteneur des messages */
+#messages {
+    height: 300px;
+    overflow-y: auto;
+    background: linear-gradient(180deg, #1a1a1a, #0e0e0e);
+    color: #ddd; /* Texte clair pour tous les messages */
+    padding: 10px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
+    border: 1px solid #444;
+}
+
+/* Message individuel */
+.message {
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 10px;
+    background: rgba(40, 40, 40, 0.95); /* Fond plus clair */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    animation: fadeIn 0.3s ease-in-out;
+    color: #ddd; /* Texte clair pour une meilleure lisibilité */
+}
+
+/* En-tête du message (pseudo et heure) */
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    color: #f1c40f; /* Jaune doré pour différencier */
+}
+
+/* Contenu du message */
+.message-content {
+    font-size: 1rem;
+    color: #eee; /* Texte blanc cassé */
+    margin-top: 5px;
+    word-wrap: break-word;
+}
+
+/* Zone de saisie */
+#message-box {
+    width: calc(100% - 90px);
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #444;
+    border-radius: 5px;
+    background: #1a1a1a;
+    color: #fff; /* Texte blanc */
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Bouton d'envoi */
+#send {
+    padding: 10px 15px;
+    background: #f39c12; /* Orange vif */
+    color: black;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.6);
+}
+
+#send:hover {
+    background: #e67e22; /* Orange plus foncé */
+    color: white;
+}
+
+
+/* Bloc de message */
+.message-block {
+    margin-bottom: 15px;
+    padding: 10px;
+    background: rgba(40, 40, 40, 0.9); /* Fond légèrement transparent */
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    transition: transform 0.2s ease, background 0.3s ease;
+}
+
+/* Effet au survol */
+.message-block:hover {
+    background: rgba(60, 60, 60, 0.9);
+    transform: scale(1.02);
+}
+
+
+
+/* Messages propres à l'utilisateur */
+.message-block.user {
+    background: rgba(80, 80, 80, 0.95); /* Différenciation pour les messages de l'utilisateur */
+    border: 1px solid #555;
 }
