@@ -24,7 +24,7 @@ class Game(db.Model):
     max_players = db.Column(db.Integer, nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     started = db.Column(db.Boolean, default=False)
-    players = db.relationship('Player', backref='game', lazy=True)  # Relation avec Player
+    players = db.relationship('Player', backref='game', cascade="all, delete-orphan", lazy=True)
 
     # Relation avec les joueurs
     players = db.relationship('Player', backref='game', lazy=True)
@@ -33,10 +33,13 @@ class Game(db.Model):
         return f'<Game {self.name}>'
 
 
+
+
 class Player(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     game_id = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=False)
+    user = db.relationship('User', backref='players', lazy=True)  # Relation avec User
 
     def __repr__(self):
         return f'<Player User: {self.user_id} in Game: {self.game_id}>'

@@ -247,50 +247,83 @@ def join_game():
         flash("Veuillez vous connecter pour rejoindre une partie.", "danger")
         return redirect(url_for('login'))
 
-    games = Game.query.all()  # Récupérer toutes les parties
+    # Récupérer les parties non commencées
+    games = Game.query.filter_by(started=False).all()
 
     if request.method == 'POST':
         game_id = request.form.get('game_id')
-        game = Game.query.get(game_id)
 
+        # Validation de game_id
+        if not game_id or not game_id.isdigit():
+            flash("Aucune partie valide sélectionnée.", "danger")
+            return redirect(url_for('join_game'))
+
+        game = Game.query.get(game_id)
         if not game:
             flash("Cette partie n'existe pas.", "danger")
             return redirect(url_for('join_game'))
 
+        # Vérifier si l'utilisateur est déjà inscrit dans une partie
+        existing_player = Player.query.filter_by(user_id=session['user_id']).first()
+        if existing_player:
+            if existing_player.game_id == game_id:
+                flash("Vous êtes déjà inscrit dans cette partie.", "info")
+                return redirect(url_for('waiting_room', game_id=game_id))
+            else:
+                flash("Vous êtes déjà inscrit dans une autre partie.", "danger")
+                return redirect(url_for('home'))
+
         # Vérifier si la partie est complète
         if len(game.players) >= game.max_players:
-            return redirect(url_for('game_page', game_id=game_id))
-
-        # Vérifier si le joueur est déjà inscrit
-        existing_player = Player.query.filter_by(user_id=session['user_id'], game_id=game_id).first()
-        if existing_player:
-            flash("Vous avez déjà rejoint cette partie.", "info")
-            return redirect(url_for('join_game'))
+            flash("Cette partie est déjà complète.", "info")
+            return redirect(url_for('waiting_room', game_id=game_id))
 
         # Ajouter le joueur à la partie
         new_player = Player(user_id=session['user_id'], game_id=game_id)
         db.session.add(new_player)
         db.session.commit()
 
-        # Si la partie est maintenant complète, redirigez vers la page du jeu
-        if len(game.players) >= game.max_players:
-            return redirect(url_for('game_page', game_id=game_id))
-
-        flash(f"Vous avez rejoint la partie '{game.name}' !", "success")
-        return redirect(url_for('home'))
+        flash(f"Vous avez rejoint la partie '{game.name}'.", "success")
+        return redirect(url_for('waiting_room', game_id=game_id))
 
     return render_template('join_game.html', games=games)
 
 
 
-# Exemple de route pour la salle d'attente
-@app.route('/waiting_room/<int:game_id>', methods=['GET'])
-def waiting_room(game_id):
-    if 'user_id' not in session:
-        flash("Veuillez vous connecter pour rejoindre une salle d'attente.", "danger")
-        return redirect(url_for('login'))
+@app.route('/clean_players')
+def clean_players():
+    players = Player.query.all()
+    for player in players:
+        game = Game.query.get(player.game_id)
+        if not game:
+            db.session.delete(player)
+    db.session.commit()
+    flash("Données des joueurs nettoyées.", "info")
+    return redirect(url_for('home'))
 
-    return render_template('waiting_room.html', game_id=game_id, username=session.get('username'))
+@app.route('/clean_database')
+def clean_database():
+    players = Player.query.all()
+    for player in players:
+        if not Game.query.get(player.game_id):
+            db.session.delete(player)
+    db.session.commit()
+    flash("Base de données nettoyée des joueurs fantômes.", "info")
+    return redirect(url_for('home'))
+
+@app.route('/waiting_room/<int:game_id>')
+def waiting_room(game_id):
+    game = Game.query.get(game_id)
+    if not game:
+        flash("Cette partie n'existe pas.", "danger")
+        return redirect(url_for('join_game'))
+
+    players = game.players
+    print(f"Players in game {game_id}: {[player.user.username if player.user else 'Utilisateur inconnu' for player in players]}")  # Debug
+    messages = []  # Ajoutez ici la logique pour récupérer les messages si nécessaire
+
+    return render_template('waiting_room.html', game=game, players=players, messages=messages)
+
 
 # Gestion des messages en temps réel avec SocketIO
 @socketio.on('join')
@@ -328,22 +361,31 @@ def handle_leave(data):
     send(f"{username} a quitté la salle.", to=room)
 
 
-@app.route('/game/<int:game_id>', methods=['GET', 'POST'])
+@app.route('/game/<int:game_id>')
 def game_page(game_id):
     game = Game.query.get(game_id)
     if not game:
         flash("Cette partie n'existe pas.", "danger")
-        return redirect(url_for('join_game'))
+        return redirect(url_for('home'))
 
-    if len(game.players) < game.max_players:
-        flash("La partie n'est pas encore complète.", "warning")
-        return redirect(url_for('join_game'))
+    # Sérialiser les joueurs pour le frontend
+    players = [
+        {
+            "id": player.id,
+            "user_id": player.user_id,
+            "username": player.user.username if player.user else "Utilisateur inconnu"
+        }
+        for player in game.players
+    ]
 
-    # Attribution des rôles
-    players = game.players
-    roles = assign_roles(players)
+    # Exemple de rôles (assurez-vous que vos rôles sont également sérialisables)
+    roles = [
+        {"player_id": role.player_id, "role": role.role}
+        for role in game.roles
+    ] if hasattr(game, "roles") else []
 
-    return render_template('game.html', game=game, roles=roles)
+    return render_template('game.html', game=game, players=players, roles=roles)
+
 
 votes = {}  # Dictionnaire pour stocker les votes
 
@@ -378,6 +420,79 @@ def handle_vote(data):
 
         # Réinitialisez les votes
         votes[room] = {}
+
+@app.route('/start_game/<int:game_id>', methods=['POST'])
+def start_game(game_id):
+    game = Game.query.get(game_id)
+    if not game:
+        flash("Cette partie n'existe pas.", "danger")
+        return redirect(url_for('join_game'))
+
+    # Vérifier si l'utilisateur est l'hôte
+    if session['user_id'] != game.created_by:
+        flash("Vous n'êtes pas autorisé à démarrer cette partie.", "danger")
+        return redirect(url_for('waiting_room', game_id=game_id))
+
+    # Démarrer la partie
+    game.started = True
+    db.session.commit()
+
+    flash("La partie a commencé !", "success")
+    return redirect(url_for('game_page', game_id=game_id))
+
+@socketio.on('start_game')
+def handle_start_game(data):
+    game_id = data['game_id']
+    game = Game.query.get(game_id)
+
+    # Vérifiez que l'utilisateur est l'hôte
+    if session['user_id'] != game.created_by:
+        emit('error', {'message': "Vous n'êtes pas autorisé à démarrer cette partie."})
+        return
+
+    # Démarrer la partie
+    game.started = True
+    db.session.commit()
+
+    emit('game_started', {'game_id': game_id}, broadcast=True, to=f"game_{game_id}")
+
+@app.route('/delete_game/<int:game_id>', methods=['POST'])
+def delete_game(game_id):
+    game = Game.query.get(game_id)
+    if not game:
+        flash("La partie n'existe pas.", "danger")
+        return redirect(url_for('home'))
+
+    # Vérifiez si l'utilisateur est l'hôte
+    if session['user_id'] != game.created_by:
+        flash("Vous n'êtes pas autorisé à supprimer cette partie.", "danger")
+        return redirect(url_for('home'))
+
+    # Supprimez les joueurs associés à la partie
+    Player.query.filter_by(game_id=game_id).delete()
+
+    # Supprimez la partie
+    db.session.delete(game)
+    db.session.commit()
+
+    flash("La partie a été supprimée.", "success")
+    return redirect(url_for('home'))
+
+@app.route('/remove_players_from_game/<int:game_id>', methods=['POST'])
+def remove_players_from_game(game_id):
+    game = Game.query.get(game_id)
+    if not game:
+        flash("La partie n'existe pas.", "danger")
+        return redirect(url_for('home'))
+
+    # Supprimez les joueurs associés à la partie
+    Player.query.filter_by(game_id=game_id).delete()
+    db.session.commit()
+
+    flash("Tous les joueurs ont été retirés de la partie.", "success")
+    return redirect(url_for('home'))
+
+
 
 
 

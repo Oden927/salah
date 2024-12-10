@@ -17,25 +17,41 @@
     </div>
 
     <div class="content">
-        <h1>Salle d'attente - Partie {{ game_id }}</h1>
-        <div id="messages" class="messages-container">
-            <!-- Les messages s'afficheront ici -->
-            <div id="messages">
+        <h1>Salle d'attente - Partie {{ game.name }}</h1>
+        <p>Nombre maximum de joueurs : {{ game.max_players }}</p>
+        
+        <h2>Joueurs inscrits :</h2>
+        <ul>
+            {% for player in players %}
+            <li>{{ player.user.username }}</li>
+            {% endfor %}
+        </ul>
+        
+        {% if session['user_id'] == game.created_by %}
+        <button id="start-game">Démarrer la partie</button>
+        {% endif %}
+        
+        <div id="chat-container">
+            <h2>Chat</h2>
+            <div id="messages" class="messages-container">
                 {% for msg in messages %}
-                    <div class="message">
-                        <strong>{{ msg.user.username }}</strong> : {{ msg.content }}
-                        <span class="timestamp">{{ msg.timestamp.strftime('%H:%M:%S') }}</span>
-                    </div>
+                <div class="message">
+                    <strong>{{ msg.user.username }}</strong> : {{ msg.content }}
+                    <span class="timestamp">{{ msg.timestamp.strftime('%H:%M:%S') }}</span>
+                </div>
                 {% endfor %}
             </div>
-            
+            <input type="text" id="message-box" placeholder="Écrivez un message...">
+            <button id="send">Envoyer</button>
+        </div>
+    </div>
 
     <script>
         const socket = io();
 
         // Rejoindre la salle
-        const username = "{{ username }}";
-        const room = "game_{{ game_id }}";
+        const username = "{{ session['username'] }}";
+        const room = "game_{{ game.id }}";
         socket.emit('join', { username: username, room: room });
 
         // Envoyer un message
@@ -52,11 +68,8 @@
         // Afficher les messages
         const messagesDiv = document.getElementById('messages');
         socket.on('message', (data) => {
-            // Création d'un conteneur de message
             const msg = document.createElement('div');
             msg.classList.add('message-block');
-
-            // Ajouter le contenu du message
             msg.innerHTML = `
                 <div class="message-header">
                     <strong>${data.username || "Utilisateur inconnu"}</strong>
@@ -64,12 +77,29 @@
                 </div>
                 <div class="message-content">${data.message || "Message non disponible"}</div>
             `;
-
             messagesDiv.appendChild(msg);
             messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll automatique
         });
 
-        // Gérer la fermeture de la fenêtre
+        // Démarrer la partie
+        const startGameButton = document.getElementById('start-game');
+        startGameButton?.addEventListener('click', () => {
+            fetch(`/start_game/{{ game.id }}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            }).then(response => {
+                if (response.ok) {
+                    alert("La partie a commencé !");
+                    window.location.href = `/game/{{ game.id }}`;
+                } else {
+                    alert("Erreur : Impossible de démarrer la partie.");
+                }
+            });
+        });
+
+        // Gérer la fermeture
         window.addEventListener('beforeunload', () => {
             socket.emit('leave', { username: username, room: room });
         });

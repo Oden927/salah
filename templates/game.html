@@ -117,6 +117,12 @@
             alert(`${data.eliminatedPlayer} a été éliminé !`);
             location.reload(); // Recharge la page pour continuer
         });
+        const players = JSON.parse('{{ players | tojson | safe }}');
+        console.log("Players:", players);
+
+        const roles = JSON.parse('{{ roles | tojson | safe }}');
+        console.log("Roles:", roles);
+
 
         // Lancer la discussion
         startDiscussion();
