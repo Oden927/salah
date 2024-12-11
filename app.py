@@ -14,6 +14,9 @@ import os
 app = Flask(__name__)
 app.secret_key = 'votre_cle_secrete'  # Utilisez une clé secrète sécurisée
 socketio = SocketIO(app)
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 
 
@@ -323,6 +326,8 @@ def clean_database():
     flash("Base de données nettoyée des joueurs fantômes.", "info")
     return redirect(url_for('home'))
 
+
+
 @app.route('/waiting_room/<int:game_id>')
 def waiting_room(game_id):
     game = Game.query.get(game_id)
@@ -333,10 +338,13 @@ def waiting_room(game_id):
     players = game.players
     host = game.get_host()
 
-    is_host = session.get('user_id') == host.id if host else False
+    # Débogage pour vérifier la session utilisateur
+    print(f"Session User ID: {session.get('user_id')}, Host ID: {host.id if host else 'None'}")
+
+    # Vérifiez si l'utilisateur est l'hôte
+    is_host = session.get('user_id') == (host.id if host else None)
 
     return render_template('waiting_room.html', game=game, players=players, is_host=is_host)
-
 
 
 # Gestion des messages en temps réel avec SocketIO
@@ -442,17 +450,22 @@ def start_game(game_id):
         flash("Cette partie n'existe pas.", "danger")
         return redirect(url_for('home'))
 
+    # Débogage : Affichez l'hôte actuel
     host = game.get_host()
+    print(f"Host ID: {host.id if host else 'None'}, Session User ID: {session.get('user_id')}")
 
-    if session['user_id'] != (host.id if host else None):
+    # Vérifiez l'accès pour démarrer
+    if not host or session['user_id'] != host.id:
         flash("Vous n'êtes pas autorisé à démarrer cette partie.", "danger")
         return redirect(url_for('waiting_room', game_id=game_id))
 
+    # Démarrez la partie
     game.started = True
     db.session.commit()
 
     flash("La partie a commencé !", "success")
     return redirect(url_for('game_page', game_id=game_id))
+
 
 
 @socketio.on('start_game')
