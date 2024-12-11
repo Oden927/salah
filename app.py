@@ -455,9 +455,6 @@ def start_game(game_id):
     return redirect(url_for('game_page', game_id=game_id))
 
 
-    flash("La partie a commencé !", "success")
-    return redirect(url_for('game_page', game_id=game_id))
-
 @socketio.on('start_game')
 def handle_start_game(data):
     game_id = data['game_id']
