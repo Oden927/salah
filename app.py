@@ -45,14 +45,26 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)  # Initialiser la base de données avec l'application Flask
 migrate = Migrate(app, db)  # Initialiser Flask-Migrate avec Flask et SQLAlchemy
 
+
 @app.route('/')
 def home():
-    if 'user_id' in session:
-        games = Game.query.filter_by(created_by=session['user_id']).all()  # Parties de l'utilisateur
-    else:
-        games = []
+    if 'user_id' not in session:
+        flash("Veuillez vous connecter pour accéder à cette page.", "danger")
+        return redirect(url_for('login'))
 
-    return render_template('home.html', games=games)
+    print(f"User ID: {session['user_id']}")  # Vérifiez si l'utilisateur est bien connecté
+
+    games = Game.query.filter_by(created_by=session['user_id']).all()
+    print("Games récupérés :", games)  # Débogage
+
+    current_user_game = None
+    player = Player.query.filter_by(user_id=session['user_id']).first()
+    if player:
+        current_user_game = Game.query.get(player.game_id)
+    print("Partie actuelle de l'utilisateur :", current_user_game)  # Débogage
+
+    return render_template('home.html', games=games, current_user_game=current_user_game)
+
 
 
 
@@ -492,6 +504,22 @@ def remove_players_from_game(game_id):
     flash("Tous les joueurs ont été retirés de la partie.", "success")
     return redirect(url_for('home'))
 
+
+@app.route('/leave_game', methods=['POST'])
+def leave_game():
+    if 'user_id' not in session:
+        flash("Veuillez vous connecter pour accéder à cette page.", "danger")
+        return redirect(url_for('login'))
+
+    player = Player.query.filter_by(user_id=session['user_id']).first()
+    if player:
+        db.session.delete(player)
+        db.session.commit()
+        flash("Vous avez quitté la partie avec succès.", "success")
+    else:
+        flash("Vous n'êtes pas dans une partie.", "danger")
+
+    return redirect(url_for('home'))
 
 
 

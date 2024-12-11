@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -8,7 +7,6 @@
     <!-- Lien vers le fichier CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-
 </head>
 <body>
     <!-- Barre de navigation -->
@@ -29,17 +27,26 @@
         {% endif %}
     </div>
     
+    
     <!-- Contenu principal -->
     <div class="content">
-                <h1>Bienvenue sur Loup-Garou</h1>
-                {% if session.get('username') %}
-                    <p>Bonjour {{ session.get('username') }} !</p>
-                    <a href="{{ url_for('create_game') }}" class="button">Créer une partie</a>
-                    <a href="{{ url_for('join_game') }}" class="button">Rejoindre une partie</a>
-                {% else %}
-                    <p>Veuillez vous connecter pour accéder aux parties.</p>
-                    <a href="{{ url_for('login') }}" class="button">Connexion</a>
-                {% endif %}
+        <h1>Bienvenue sur Loup-Garou</h1>
+        {% if session.get('username') %}
+            <p>Bonjour {{ session.get('username') }} !</p>
+            <a href="{{ url_for('create_game') }}" class="button">Créer une partie</a>
+            <a href="{{ url_for('join_game') }}" class="button">Rejoindre une partie</a>
+                        <!-- Bouton pour quitter la partie en cours -->
+            {% if current_user_game %}
+                <form action="{{ url_for('leave_game') }}" method="POST" style="display:inline;">
+                    <button type="submit" class="button danger">
+                        Quitter la partie "{{ current_user_game.name }}"
+                    </button>
+                </form>
+            {% endif %}
+        {% else %}
+            <p>Veuillez vous connecter pour accéder aux parties.</p>
+            <a href="{{ url_for('login') }}" class="button">Connexion</a>
+        {% endif %}
     </div>
 </body>
 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -51,6 +58,4 @@
         </div>
     {% endif %}
 {% endwith %}
-
 </html>
-
