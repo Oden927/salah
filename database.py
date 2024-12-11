@@ -29,6 +29,12 @@ class Game(db.Model):
     # Relation avec les joueurs
     players = db.relationship('Player', backref='game', lazy=True)
 
+
+    def get_host(self):
+        # Obtenir l'utilisateur actuel ou successeur s'il a quitté
+        first_player = Player.query.filter_by(game_id=self.id).first()
+        return first_player.user if first_player else None
+
     def __repr__(self):
         return f'<Game {self.name}>'
 

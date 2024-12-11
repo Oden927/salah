@@ -23,7 +23,7 @@ app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USERNAME'] = 'apikey'  # Nom d'utilisateur obligatoire pour SendGrid
 app.config['MAIL_PASSWORD'] = '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'  # Clé API générée sur SendGrid
-app.config['MAIL_DEFAULT_SENDER'] = 's.bektera@gmail.com'  # Expéditeur par défaut
+app.config['MAIL_DEFAULT_SENDER'] = 'loupgarou92700@gmail.com'  # Expéditeur par défaut
 # Configuration de la base de données
 if 'DATABASE_URL' in os.environ:
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DATABASE_URL']
@@ -328,13 +328,15 @@ def waiting_room(game_id):
     game = Game.query.get(game_id)
     if not game:
         flash("Cette partie n'existe pas.", "danger")
-        return redirect(url_for('join_game'))
+        return redirect(url_for('home'))
 
     players = game.players
-    print(f"Players in game {game_id}: {[player.user.username if player.user else 'Utilisateur inconnu' for player in players]}")  # Debug
-    messages = []  # Ajoutez ici la logique pour récupérer les messages si nécessaire
+    host = game.get_host()
 
-    return render_template('waiting_room.html', game=game, players=players, messages=messages)
+    is_host = session.get('user_id') == host.id if host else False
+
+    return render_template('waiting_room.html', game=game, players=players, is_host=is_host)
+
 
 
 # Gestion des messages en temps réel avec SocketIO
@@ -438,16 +440,20 @@ def start_game(game_id):
     game = Game.query.get(game_id)
     if not game:
         flash("Cette partie n'existe pas.", "danger")
-        return redirect(url_for('join_game'))
+        return redirect(url_for('home'))
 
-    # Vérifier si l'utilisateur est l'hôte
-    if session['user_id'] != game.created_by:
+    host = game.get_host()
+
+    if session['user_id'] != (host.id if host else None):
         flash("Vous n'êtes pas autorisé à démarrer cette partie.", "danger")
         return redirect(url_for('waiting_room', game_id=game_id))
 
-    # Démarrer la partie
     game.started = True
     db.session.commit()
+
+    flash("La partie a commencé !", "success")
+    return redirect(url_for('game_page', game_id=game_id))
+
 
     flash("La partie a commencé !", "success")
     return redirect(url_for('game_page', game_id=game_id))
