@@ -335,14 +335,13 @@ def waiting_room(game_id):
         flash("Cette partie n'existe pas.", "danger")
         return redirect(url_for('home'))
 
-    players = game.players
+    # Récupérez l'hôte actuel
     host = game.get_host()
 
-    # Débogage pour vérifier la session utilisateur
-    print(f"Session User ID: {session.get('user_id')}, Host ID: {host.id if host else 'None'}")
+    # Définissez si l'utilisateur actuel est l'hôte
+    is_host = session.get('user_id') == (host.user_id if host else None)
 
-    # Vérifiez si l'utilisateur est l'hôte
-    is_host = session.get('user_id') == (host.id if host else None)
+    players = game.players
 
     return render_template('waiting_room.html', game=game, players=players, is_host=is_host)
 

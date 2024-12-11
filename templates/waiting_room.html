@@ -31,8 +31,11 @@
         <form action="{{ url_for('start_game', game_id=game.id) }}" method="POST">
             <button type="submit" class="auth-button">Démarrer la partie</button>
         </form>
+        {% else %}
+        <p>Seul l'hôte peut démarrer la partie.</p>
         {% endif %}
         
+
         <div id="chat-container">
             <h2>Chat</h2>
             <div id="messages" class="messages-container">
