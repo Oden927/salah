@@ -330,6 +330,14 @@ def get_host(self):
     first_player = Player.query.filter_by(game_id=self.id).order_by(Player.id).first()
     return first_player  # Cela retourne bien l'objet `Player`
 
+def assign_new_host(self):
+    # Trouver le premier joueur encore dans la partie
+    new_host = Player.query.filter_by(game_id=self.id).order_by(Player.id).first()
+    if new_host:
+        self.created_by = new_host.user_id
+        db.session.commit()
+
+
 
 @app.route('/waiting_room/<int:game_id>')
 def waiting_room(game_id):
@@ -447,26 +455,30 @@ def handle_vote(data):
 
 @app.route('/start_game/<int:game_id>', methods=['POST'])
 def start_game(game_id):
+    if 'user_id' not in session:
+        flash("Veuillez vous connecter pour accéder à cette page.", "danger")
+        return redirect(url_for('login'))
+
     game = Game.query.get(game_id)
     if not game:
         flash("Cette partie n'existe pas.", "danger")
         return redirect(url_for('home'))
 
-    # Débogage : Affichez l'hôte actuel
-    host = game.get_host()
-    print(f"Host ID: {host.id if host else 'None'}, Session User ID: {session.get('user_id')}")
-
-    # Vérifiez l'accès pour démarrer
-    if session.get('user_id') != (host.user_id if host else None):
-        flash("Vous n'êtes pas autorisé à démarrer cette partie.", "danger")
+    # Vérifier si l'utilisateur est l'hôte
+    host = Player.query.filter_by(game_id=game_id).order_by(Player.id).first()
+    if session['user_id'] != host.user_id:
+        flash("Seul l'hôte peut démarrer la partie.", "danger")
         return redirect(url_for('waiting_room', game_id=game_id))
 
-    # Démarrez la partie
     game.started = True
     db.session.commit()
 
-    flash("La partie a commencé !", "success")
+    # Émettre un événement Socket.IO
+    socketio.emit('start_game', {'game_id': game_id}, to=f'game_{game_id}')
+
+    flash("La partie a démarré !", "success")
     return redirect(url_for('game_page', game_id=game_id))
+
 
 
 
@@ -475,16 +487,24 @@ def handle_start_game(data):
     game_id = data['game_id']
     game = Game.query.get(game_id)
 
-    # Vérifiez que l'utilisateur est l'hôte
+    if not game:
+        emit('error', {'message': "La partie n'existe pas."})
+        return
+
+    # Verify the user is the host
     if session['user_id'] != game.created_by:
         emit('error', {'message': "Vous n'êtes pas autorisé à démarrer cette partie."})
         return
 
-    # Démarrer la partie
+    # Start the game
     game.started = True
     db.session.commit()
 
-    emit('game_started', {'game_id': game_id}, broadcast=True, to=f"game_{game_id}")
+    # Emit the start_game event to all users in the room
+    socketio.emit('start_game', {'game_id': game_id}, to=f'game_{game_id}')
+
+
+    # Emit the event to all players in the game room
 
 @app.route('/delete_game/<int:game_id>', methods=['POST'])
 def delete_game(game_id):
@@ -530,9 +550,25 @@ def leave_game():
         return redirect(url_for('login'))
 
     player = Player.query.filter_by(user_id=session['user_id']).first()
+    
     if player:
+        game = Game.query.get(player.game_id)  # Récupérer la partie
         db.session.delete(player)
         db.session.commit()
+
+        # Si l'utilisateur qui quitte est l'hôte
+        if game and game.created_by == session['user_id']:
+            # Trouver un nouveau joueur pour être l'hôte
+            new_host = Player.query.filter_by(game_id=game.id).order_by(Player.id).first()
+            if new_host:
+                game.created_by = new_host.user_id
+                db.session.commit()
+                flash("Un nouvel hôte a été désigné.", "info")
+            else:
+                flash("La partie a été supprimée car aucun joueur n'est resté.", "info")
+                db.session.delete(game)
+                db.session.commit()
+
         flash("Vous avez quitté la partie avec succès.", "success")
     else:
         flash("Vous n'êtes pas dans une partie.", "danger")

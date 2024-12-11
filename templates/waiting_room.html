@@ -54,10 +54,19 @@
     <script>
         const socket = io();
 
-        // Rejoindre la salle
+        // Join the room
         const username = "{{ session['username'] }}";
-        const room = "game_{{ game.id }}";
+        const currentGameId = "{{ game.id }}";
+        const room = `game_${currentGameId}`;
         socket.emit('join', { username: username, room: room });
+
+        // Listen for the start_game event
+        socket.on('start_game', (data) => {
+            console.log("Start game event received:", data);
+            if (data.game_id == currentGameId) {
+                window.location.href = `/game/${data.game_id}`;
+            }
+        });
 
         // Envoyer un message
         const sendButton = document.getElementById('send');
@@ -69,7 +78,7 @@
                 messageBox.value = ''; // Effacer la zone de saisie
             }
         });
-
+        
         // Afficher les messages
         const messagesDiv = document.getElementById('messages');
         socket.on('message', (data) => {
@@ -85,6 +94,7 @@
             messagesDiv.appendChild(msg);
             messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll automatique
         });
+        
 
         // Démarrer la partie
         const startGameButton = document.getElementById('start-game');
@@ -109,5 +119,6 @@
             socket.emit('leave', { username: username, room: room });
         });
     </script>
+    
 </body>
 </html>
