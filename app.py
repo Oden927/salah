@@ -326,6 +326,9 @@ def clean_database():
     flash("Base de données nettoyée des joueurs fantômes.", "info")
     return redirect(url_for('home'))
 
+def get_host(self):
+    first_player = Player.query.filter_by(game_id=self.id).order_by(Player.id).first()
+    return first_player  # Cela retourne bien l'objet `Player`
 
 
 @app.route('/waiting_room/<int:game_id>')
@@ -454,7 +457,7 @@ def start_game(game_id):
     print(f"Host ID: {host.id if host else 'None'}, Session User ID: {session.get('user_id')}")
 
     # Vérifiez l'accès pour démarrer
-    if not host or session['user_id'] != host.id:
+    if session.get('user_id') != (host.user_id if host else None):
         flash("Vous n'êtes pas autorisé à démarrer cette partie.", "danger")
         return redirect(url_for('waiting_room', game_id=game_id))
 
