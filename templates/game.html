@@ -88,6 +88,24 @@
                 }
             }, 1000);
         }
+        // Minuteur de discussion
+        function startDiscussion() {
+            const timerDisplay = document.getElementById('timer');
+            const timerInterval = setInterval(() => {
+                if (discussionTime > 0) {
+                    const minutes = Math.floor(discussionTime / 60);
+                    const seconds = discussionTime % 60;
+                    timerDisplay.textContent = `Temps restant : ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                    discussionTime--;
+                } else {
+                    clearInterval(timerInterval);
+                    startVoting(); // Passe à la phase de vote
+                }
+            }, 1000);
+        }
+        console.log(`Temps restant : ${discussionTime} secondes`);
+
+
 
         // Phase de vote
         function startVoting() {
