@@ -25,7 +25,7 @@ class Game(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     started = db.Column(db.Boolean, default=False)
     players = db.relationship('Player', backref='game', cascade="all, delete-orphan", lazy=True)
-
+    discussion_start_time = db.Column(db.DateTime, nullable=True)
     # Relation avec les joueurs
     players = db.relationship('Player', backref='game', lazy=True)
 

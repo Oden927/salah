@@ -71,9 +71,7 @@ def home():
 
 
 
-# Créer la base de données si elle n'existe pas encore
-with app.app_context():
-    db.create_all()
+
 
 
 
@@ -455,20 +453,18 @@ def handle_vote(data):
 
 @app.route('/start_game/<int:game_id>', methods=['POST'])
 def start_game(game_id):
-    if 'user_id' not in session:
-        flash("Veuillez vous connecter pour accéder à cette page.", "danger")
-        return redirect(url_for('login'))
-
     game = Game.query.get(game_id)
     if not game:
-        flash("Cette partie n'existe pas.", "danger")
+        flash("La partie n'existe pas.", "danger")
         return redirect(url_for('home'))
 
-    # Vérifier si l'utilisateur est l'hôte
-    host = Player.query.filter_by(game_id=game_id).order_by(Player.id).first()
-    if session['user_id'] != host.user_id:
-        flash("Seul l'hôte peut démarrer la partie.", "danger")
-        return redirect(url_for('waiting_room', game_id=game_id))
+    game.started = True
+    game.discussion_start_time = datetime.utcnow()  # Enregistrez l'heure de début
+    db.session.commit()
+
+    socketio.emit('start_game', {'game_id': game_id}, to=f'game_{game_id}')
+    flash("La partie a démarré !", "success")
+    return redirect(url_for('game_page', game_id=game_id))
 
     game.started = True
     db.session.commit()
@@ -575,8 +571,25 @@ def leave_game():
 
     return redirect(url_for('home'))
 
+@app.route('/game_timer/<int:game_id>')
+def game_timer(game_id):
+    game = Game.query.get(game_id)
+    if not game or not game.started:
+        return {"remaining_time": 300}  # Par défaut, 5 minutes
+
+    try:
+        remaining_time = game.get_remaining_time()
+        print(f"Temps restant pour le jeu {game_id} : {remaining_time} secondes")
+        return {"remaining_time": remaining_time}
+    except Exception as e:
+        print(f"Erreur dans game_timer : {e}")
+        return {"remaining_time": 300}  # Valeur de secours
 
 
+
+# Créer la base de données si elle n'existe pas encore
+with app.app_context():
+    db.create_all()
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)

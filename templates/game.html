@@ -40,54 +40,22 @@
 
         const username = "{{ session['username'] }}";
         const room = "game_{{ game.id }}";
-        let discussionTime = 300; // 5 minutes
+        let discussionTime = 0; // Temps restant sera mis à jour depuis le serveur
 
         // Rejoindre la salle
         socket.emit('join', { username: username, room: room });
 
-        // Envoyer un message
-        const sendButton = document.getElementById('send');
-        const messageBox = document.getElementById('message-box');
-        const messagesDiv = document.getElementById('messages');
+        // Récupérer le temps restant depuis le serveur
+        fetch(`/game_timer/{{ game.id }}`)
+            .then(response => response.json())
+            .then(data => {
+                discussionTime = data.remaining_time; // Synchroniser avec le serveur
+                startDiscussion();
+            })
+            .catch(error => {
+                console.error("Erreur lors de la récupération du temps :", error);
+            });
 
-        sendButton.addEventListener('click', () => {
-            const message = messageBox.value.trim();
-            if (message) {
-                socket.emit('message', { username: username, message: message, room: room });
-                messageBox.value = '';
-            }
-        });
-
-        // Afficher les messages
-        socket.on('message', (data) => {
-            const msg = document.createElement('div');
-            msg.classList.add('message-block');
-            msg.innerHTML = `
-                <div class="message-header">
-                    <strong>${data.username || "Utilisateur inconnu"}</strong>
-                    <span>${data.timestamp || new Date().toLocaleTimeString()}</span>
-                </div>
-                <div class="message-content">${data.message || "Message non disponible"}</div>
-            `;
-            messagesDiv.appendChild(msg);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        });
-
-        // Minuteur de discussion
-        function startDiscussion() {
-            const timerDisplay = document.getElementById('timer');
-            const timerInterval = setInterval(() => {
-                const minutes = Math.floor(discussionTime / 60);
-                const seconds = discussionTime % 60;
-                timerDisplay.textContent = `Temps restant : ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-                discussionTime--;
-
-                if (discussionTime < 0) {
-                    clearInterval(timerInterval);
-                    startVoting();
-                }
-            }, 1000);
-        }
         // Minuteur de discussion
         function startDiscussion() {
             const timerDisplay = document.getElementById('timer');
@@ -99,13 +67,10 @@
                     discussionTime--;
                 } else {
                     clearInterval(timerInterval);
-                    startVoting(); // Passe à la phase de vote
+                    startVoting(); // Transition vers la phase de vote
                 }
             }, 1000);
         }
-        console.log(`Temps restant : ${discussionTime} secondes`);
-
-
 
         // Phase de vote
         function startVoting() {
@@ -135,15 +100,33 @@
             alert(`${data.eliminatedPlayer} a été éliminé !`);
             location.reload(); // Recharge la page pour continuer
         });
-        const players = JSON.parse('{{ players | tojson | safe }}');
-        console.log("Players:", players);
 
-        const roles = JSON.parse('{{ roles | tojson | safe }}');
-        console.log("Roles:", roles);
+        // Gestion des messages
+        const sendButton = document.getElementById('send');
+        const messageBox = document.getElementById('message-box');
+        const messagesDiv = document.getElementById('messages');
 
+        sendButton.addEventListener('click', () => {
+            const message = messageBox.value.trim();
+            if (message) {
+                socket.emit('message', { username: username, message: message, room: room });
+                messageBox.value = '';
+            }
+        });
 
-        // Lancer la discussion
-        startDiscussion();
+        socket.on('message', (data) => {
+            const msg = document.createElement('div');
+            msg.classList.add('message-block');
+            msg.innerHTML = `
+                <div class="message-header">
+                    <strong>${data.username || "Utilisateur inconnu"}</strong>
+                    <span>${data.timestamp || new Date().toLocaleTimeString()}</span>
+                </div>
+                <div class="message-content">${data.message || "Message non disponible"}</div>
+            `;
+            messagesDiv.appendChild(msg);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        });
     </script>
 </body>
 </html>
