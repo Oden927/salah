@@ -50,15 +50,25 @@
         <!-- Minuteur -->
         <p id="timer">Temps restant : 5:00</p>
 
-        <!-- Chat pour la discussion -->
         <div id="chat" class="chat-container">
             <h2>Discussion</h2>
-            <div id="messages" class="messages-container">
-                <!-- Les messages s'afficheront ici -->
-            </div>
-            <input type="text" id="message-box" placeholder="Tapez votre message..." class="message-input">
-            <button id="send" class="auth-button">Envoyer</button>
+            {% if game.current_phase == 'night' and player.role == "Loup-Garou" %}
+                <div id="messages" class="messages-container">
+                    <!-- Les messages s'afficheront ici -->
+                </div>
+                <input type="text" id="message-box" placeholder="Tapez votre message..." class="message-input">
+                <button id="send" class="auth-button">Envoyer</button>
+            {% elif game.current_phase == 'night' %}
+                <p>Le chat est désactivé pour les non-Loups-Garous pendant la nuit.</p>
+            {% else %}
+                <div id="messages" class="messages-container">
+                    <!-- Les messages s'afficheront ici -->
+                </div>
+                <input type="text" id="message-box" placeholder="Tapez votre message..." class="message-input">
+                <button id="send" class="auth-button">Envoyer</button>
+            {% endif %}
         </div>
+        
 
         <!-- Actions spécifiques aux rôles -->
         {% if player.role == 'Loup-Garou' and game.current_phase == 'night' %}
@@ -169,12 +179,21 @@
             const minutes = Math.floor(remainingTime / 60);
             const seconds = remainingTime % 60;
             timerDisplay.textContent = `Temps restant : ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-            
+
             if (remainingTime <= 0) {
                 clearInterval(timerInterval);
-                startVoting();
+                // Informer le backend que le temps est écoulé
+                fetch(`/game/${game.id}/next_phase`, {
+                    method: 'POST',
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        console.error('Erreur lors du passage à la phase suivante.');
+                    }
+                });
             }
         }
+
 
         function initializeTimer() {
             // Initial timer fetch
@@ -254,6 +273,10 @@
                 }
             }
         });
+        socket.on('seer_result', (data) => {
+            alert(`Le rôle de ${data.username} est : ${data.role}`);
+        });
+
 
 
         // Notifications spécifiques aux rôles

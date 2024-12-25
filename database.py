@@ -63,7 +63,9 @@ class Player(db.Model):
     seer_used = db.Column(db.Boolean, default=False)  # Voyante : a-t-elle utilisé son pouvoir ?
     def __repr__(self):
         return f'<Player User: {self.user_id} in Game: {self.game_id}>'
-    
+    night_phase_duration = db.Column(db.Integer, default=300)  # Par défaut : 5 minutes
+    day_phase_duration = db.Column(db.Integer, default=50)  # Par défaut : 5 minutes
+
 import random
 
 def assign_roles(players):

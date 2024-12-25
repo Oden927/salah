@@ -560,6 +560,16 @@ def handle_vote(data):
 
 
 
+from threading import Timer
+
+from threading import Timer
+
+def schedule_phase_end(game):
+    """Planifie la fin de la phase actuelle."""
+    if game.current_phase == 'night':
+        Timer(game.night_phase_duration, end_night_phase, [game.id]).start()
+    elif game.current_phase == 'day':
+        Timer(game.day_phase_duration, end_voting, [game.id]).start()
 
 @app.route('/start_game/<int:game_id>', methods=['POST'])
 def start_game(game_id):
@@ -571,9 +581,7 @@ def start_game(game_id):
     # Récupérer les joueurs de la partie
     players = Player.query.filter_by(game_id=game_id).all()
 
-    # Vérifier qu'il y a suffisamment de joueurs
 
-    # Attribuer des rôles aux joueurs
     assign_roles(players)
     db.session.commit()
 
@@ -583,12 +591,13 @@ def start_game(game_id):
     game.discussion_start_time = datetime.utcnow()  # Enregistrez l'heure de début de la phase
     db.session.commit()
 
+    # Planifiez la fin de la phase de nuit
+    schedule_phase_end(game)
+
     # Notifier les joueurs que la partie a commencé
     socketio.emit('start_game', {'game_id': game_id}, to=f'game_{game_id}')
     flash("La partie a démarré !", "success")
     return redirect(url_for('game_page', game_id=game_id))
-
-
 
 
 
@@ -717,14 +726,13 @@ def get_next_phase(current_phase):
     next_phase_index = (phases.index(current_phase) + 1) % len(phases)
     return phases[next_phase_index]
 
-from threading import Timer
 def transition_phase(game):
     if game.current_phase == 'night':
         # Passez à la phase de jour
         game.current_phase = 'day'
         notification = "La journée commence. Discutez et votez pour éliminer un suspect."
 
-        # Appliquez l'élimination
+        # Si une cible a été sélectionnée par les Loups-Garous
         if game.target_id:
             target_player = Player.query.filter_by(user_id=game.target_id, game_id=game.id).first()
             if target_player and not target_player.eliminated:
@@ -738,8 +746,7 @@ def transition_phase(game):
                     'timestamp': datetime.utcnow().strftime('%H:%M:%S')
                 }, room=f'game_{game.id}')
 
-            # Réinitialisez la cible
-            game.target_id = None
+            game.target_id = None  # Réinitialisez la cible
     else:
         # Passez à la phase de nuit
         game.current_phase = 'night'
@@ -755,15 +762,25 @@ def transition_phase(game):
         'notification': notification
     }, to=f'game_{game.id}')
 
+    # Planifiez la fin de la prochaine phase
+    schedule_phase_end(game)
+
+
 
 
 
 
 def end_night_phase(game_id):
+    # Récupérer le jeu
     game = Game.query.get(game_id)
-    if game and game.current_phase == 'night':
-        transition_phase(game)  # Passez automatiquement à la phase suivante
+    if not game:
+        print(f"Game with ID {game_id} not found.")
+        return
 
+    # Vérifier que nous sommes dans la phase de nuit
+    if game.current_phase == 'night':
+        print(f"Ending night phase for game {game_id}.")
+        transition_phase(game)  # Passe à la phase de jour
 
 
 @app.route('/end_voting/<int:game_id>', methods=['POST'])
@@ -808,29 +825,24 @@ def end_voting(game_id):
 
 @app.route('/seer_action/<int:game_id>', methods=['POST'])
 def seer_action(game_id):
-    game = Game.query.get(game_id)
-    if not game:
-        flash("La partie n'existe pas.", "danger")
-        return redirect(url_for('home'))
+    if 'user_id' not in session:
+        flash("Vous devez être connecté pour effectuer cette action.", "danger")
+        return redirect(url_for('login'))
 
     player = Player.query.filter_by(user_id=session['user_id'], game_id=game_id).first()
 
-    # Vérifier si le joueur est bien la Voyante
+    # Vérifier si l'utilisateur est la Voyante
     if not player or player.role != "Voyante":
-        flash("Vous n'êtes pas autorisé à effectuer cette action.", "danger")
+        flash("Vous n'êtes pas autorisé à utiliser cette action.", "danger")
         return redirect(url_for('game_page', game_id=game_id))
 
-    # Vérifiez si c'est la phase de nuit
+    # Vérifier si c'est la phase de nuit
+    game = Game.query.get(game_id)
     if game.current_phase != 'night':
         flash("Vous ne pouvez utiliser votre pouvoir que pendant la nuit.", "danger")
         return redirect(url_for('game_page', game_id=game_id))
 
-    # Vérifier si la Voyante a déjà utilisé son pouvoir
-    if player.seer_used:
-        flash("Vous avez déjà utilisé votre pouvoir cette nuit.", "danger")
-        return redirect(url_for('game_page', game_id=game_id))
-
-    # Récupérer l'ID du joueur cible
+    # Récupérer l'ID du joueur sélectionné
     target_id = request.form.get('target_id')
     target_player = Player.query.filter_by(user_id=target_id, game_id=game_id).first()
 
@@ -838,16 +850,22 @@ def seer_action(game_id):
         flash("Le joueur sélectionné n'existe pas.", "danger")
         return redirect(url_for('game_page', game_id=game_id))
 
-    # Récupérer le rôle initial du joueur cible
-    observed_role = target_player.role
-
-    # Enregistrer que la Voyante a utilisé son pouvoir cette nuit
-    player.seer_used = True
-    db.session.commit()
-
-    # Retourner le rôle observé à la Voyante
-    flash(f"Le rôle de {target_player.user.username} est {observed_role}.", "info")
+    # Renvoyer le rôle observé
+    flash(f"Le rôle de {target_player.user.username} est : {target_player.role}.", "info")
     return redirect(url_for('game_page', game_id=game_id))
+
+@socketio.on('seer_action')
+def handle_seer_action(data):
+    game_id = data['game_id']
+    target_id = data['target_id']
+    game = Game.query.get(game_id)
+    target_player = Player.query.filter_by(user_id=target_id, game_id=game_id).first()
+
+    if game and target_player:
+        emit('seer_result', {
+            'username': target_player.user.username,
+            'role': target_player.role
+        }, room=f'game_{game_id}')
 
 
 @socketio.on('choose_victim')
