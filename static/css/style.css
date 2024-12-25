@@ -1,13 +1,13 @@
 /* Styles généraux */
 body {
-    margin: 0;
-    font-family: 'Cinzel', serif; /* Police manuscrite */
-    line-height: 1.6;
-    background: linear-gradient(180deg, #111 0%, #222 100%);
-    color: #e5e5e5;
+    background-image: url("/static/images/village.jpeg");
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    color: black;
 }
 
-/* Barre de navigation */
+
 .navbar {
     display: flex;
     justify-content: space-between;
@@ -85,6 +85,19 @@ body {
 .content button:hover {
     background-color: #d35400;
     color: white;
+}
+h1, h2, h3, p {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+
+.message-block.user {
+    background: rgba(80, 80, 80, 0.95);
+    border: 1px solid #555;
+}
+.message-block:hover {
+    background: rgba(60, 60, 60, 0.9);
+    transform: scale(1.02);
 }
 
 /* Alertes */
@@ -404,3 +417,59 @@ form button:hover {
     margin: 5px 0;
     border-radius: 5px;
 }
+
+.role-image {
+    width: 40px;
+    height: 40px;
+    vertical-align: middle;
+    margin-right: 8px;
+}
+
+.role-icon {
+    display: inline-flex;
+    align-items: center;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+
+.phase-transition {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    font-size: 2em;
+    padding: 20px 40px;
+    border-radius: 10px;
+    text-align: center;
+    z-index: 1000;
+    animation: fadeInOut 3s;
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { opacity: 0; }
+}
+/* Phase de jour */
+body.day {
+    background-image: url("/static/images/village.jpeg");
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    color: black; /* Texte lisible sur fond clair */
+}
+
+/* Phase de nuit */
+body.night {
+    background-image: url("/static/images/foret.jpeg");
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    color: white; /* Texte lisible sur fond sombre */
+}
+

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Salle d'attente</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="/styles/main.css">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 </head>
 <body>
@@ -51,74 +51,114 @@
         </div>
     </div>
 
+    <!-- Previous head and body content remains the same -->
     <script>
         const socket = io();
-
-        // Join the room
         const username = "{{ session['username'] }}";
         const currentGameId = "{{ game.id }}";
         const room = `game_${currentGameId}`;
-        socket.emit('join', { username: username, room: room });
+        const messagesDiv = document.getElementById('messages');
+        
+        // Join the room with proper user data
+        socket.emit('join', { 
+            username: username, 
+            room: room 
+        });
 
-        // Listen for the start_game event
+        // Single message event listener
+        socket.on('message', (data) => {
+            const messageUsername = data.username || "Utilisateur inconnu";
+            const messageContent = data.message || "Message non disponible";
+            const timestamp = data.timestamp || new Date().toLocaleTimeString();
+
+            const msg = document.createElement('div');
+            msg.classList.add('message-block');
+            msg.innerHTML = `
+                <div class="message-header">
+                    <strong>${messageUsername}</strong>
+                    <span>${timestamp}</span>
+                </div>
+                <div class="message-content">${messageContent}</div>
+            `;
+            messagesDiv.appendChild(msg);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        });
+
+        // Handle user join notifications
+        socket.on('user_joined', (data) => {
+            const msg = document.createElement('div');
+            msg.classList.add('message-block', 'system-message');
+            msg.innerHTML = `
+                <div class="message-content">
+                    ${data.username} a rejoint la partie
+                </div>
+            `;
+            messagesDiv.appendChild(msg);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        });
+
+        // Send message handling
+        const sendButton = document.getElementById('send');
+        const messageBox = document.getElementById('message-box');
+        
+        sendButton.addEventListener('click', () => {
+            const message = messageBox.value.trim();
+            if (message) {
+                socket.emit('message', {
+                    username: username,
+                    message: message,
+                    room: room,
+                    timestamp: new Date().toLocaleTimeString()
+                });
+                messageBox.value = '';
+            }
+        });
+
+        // Enter key support
+        messageBox.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendButton.click();
+            }
+        });
+
+        // Handle game start
         socket.on('start_game', (data) => {
-            console.log("Start game event received:", data);
             if (data.game_id == currentGameId) {
                 window.location.href = `/game/${data.game_id}`;
             }
         });
 
-        // Envoyer un message
-        const sendButton = document.getElementById('send');
-        const messageBox = document.getElementById('message-box');
-        sendButton.addEventListener('click', () => {
-            const message = messageBox.value.trim();
-            if (message) {
-                socket.emit('message', { username: username, message: message, room: room });
-                messageBox.value = ''; // Effacer la zone de saisie
-            }
-        });
-        
-        // Afficher les messages
-        const messagesDiv = document.getElementById('messages');
-        socket.on('message', (data) => {
-            const msg = document.createElement('div');
-            msg.classList.add('message-block');
-            msg.innerHTML = `
-                <div class="message-header">
-                    <strong>${data.username || "Utilisateur inconnu"}</strong>
-                    <span>${data.timestamp || new Date().toLocaleTimeString()}</span>
-                </div>
-                <div class="message-content">${data.message || "Message non disponible"}</div>
-            `;
-            messagesDiv.appendChild(msg);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll automatique
-        });
-        
-
-        // Démarrer la partie
-        const startGameButton = document.getElementById('start-game');
-        startGameButton?.addEventListener('click', () => {
-            fetch(`/start_game/{{ game.id }}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            }).then(response => {
-                if (response.ok) {
-                    alert("La partie a commencé !");
-                    window.location.href = `/game/{{ game.id }}`;
-                } else {
-                    alert("Erreur : Impossible de démarrer la partie.");
-                }
-            });
-        });
-
-        // Gérer la fermeture
+        // Clean up on page leave
         window.addEventListener('beforeunload', () => {
             socket.emit('leave', { username: username, room: room });
         });
     </script>
+
+    <style>
+        .system-message {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 5px 0;
+        }
+        
+        .message-block {
+            margin: 5px 0;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+        
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .message-content {
+            margin-top: 3px;
+        }
+</style>
     
 </body>
 </html>

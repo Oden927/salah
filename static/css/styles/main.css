@@ -1,0 +1,7 @@
+/* Main stylesheet that imports all components */
+@import 'base.css';
+@import 'layout.css';
+@import 'navbar.css';
+@import 'chat.css';
+@import 'components.css';
+@import 'animations.css';

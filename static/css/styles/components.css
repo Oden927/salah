@@ -1,0 +1,47 @@
+/* UI Components */
+.button {
+  padding: 10px 20px;
+  background: linear-gradient(to bottom, #f39c12, #d35400);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.button:hover {
+  background: linear-gradient(to bottom, #e67e22, #c0392b);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+}
+
+.vote-button {
+  background: linear-gradient(to bottom, #c0392b, #962d22);
+  color: white;
+  padding: 12px 24px;
+  margin: 6px;
+  border-radius: 6px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.vote-button:hover {
+  background: linear-gradient(to bottom, #962d22, #7d2419);
+}
+
+.alert {
+  margin: 15px auto;
+  padding: 12px 20px;
+  border-radius: 6px;
+  text-align: center;
+  font-weight: bold;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.alert.success { background-color: #27ae60; }
+.alert.danger { background-color: #c0392b; }
+.alert.info { background-color: #2980b9; }

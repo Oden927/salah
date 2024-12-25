@@ -7,8 +7,12 @@ from itsdangerous import URLSafeTimedSerializer
 from flask_socketio import SocketIO, join_room, leave_room, send
 from flask_socketio import emit
 from datetime import datetime
-from random import random
+import random
 import os
+
+
+from dotenv import load_dotenv
+load_dotenv()
 
 
 
@@ -241,17 +245,29 @@ def create_game():
             flash("Veuillez entrer un nom de partie valide et un nombre de joueurs supérieur à 2.", "danger")
             return redirect(url_for('create_game'))
 
+        # Récupérer les paramètres des rôles et des mécaniques
+        roles = request.form.getlist('roles')
+        mechanics = request.form.getlist('mechanics')
+        num_werewolves = request.form.get('num_werewolves', type=int)
+        num_villagers = request.form.get('num_villagers', type=int)
+        num_special_roles = request.form.get('num_special_roles', type=int)
+
         # Créer une nouvelle partie
         new_game = Game(
             name=game_name,
             max_players=int(max_players),
-            created_by=session['user_id']  # Associer l'hôte
+            created_by=session['user_id'],
+            current_phase='waiting',  # Phase initiale
         )
         db.session.add(new_game)
         db.session.commit()
 
+        # Sauvegarder les paramètres comme métadonnées ou dans un autre modèle si nécessaire
         flash(f"Partie '{game_name}' créée avec succès ! Vous êtes l'hôte.", "success")
-        return redirect(url_for('home'))
+        return redirect(url_for('waiting_room', game_id=new_game.id))
+
+    return render_template('create_game.html')
+
 
     return render_template('create_game.html')
 
@@ -293,9 +309,10 @@ def join_game():
             return redirect(url_for('waiting_room', game_id=game_id))
 
         # Ajouter le joueur à la partie
-        new_player = Player(user_id=session['user_id'], game_id=game_id)
+        new_player = Player(user_id=session['user_id'], game_id=game_id, role='Loup-Garou')
         db.session.add(new_player)
         db.session.commit()
+
 
         flash(f"Vous avez rejoint la partie '{game.name}'.", "success")
         return redirect(url_for('waiting_room', game_id=game_id))
@@ -380,33 +397,42 @@ def handle_message(data):
     room = data.get('room')
     game_id = room.split('_')[1]
     message = data.get('message')
-    username = data.get('username')
+    username = session.get('username', "Utilisateur inconnu")  # Utiliser le nom d'utilisateur de la session
 
     game = Game.query.get(game_id)
     player = Player.query.filter_by(user_id=session['user_id'], game_id=game_id).first()
 
-    # Vérifiez la phase actuelle
-    if game.current_phase == 'night':
-        # Seuls les Loups-Garous peuvent parler pendant la nuit
-        if player.role != "Loup-Garou":
-            emit('error', {'message': "Vous ne pouvez pas parler pendant la nuit."})
-            return
+    if not game or not player:
+        emit('error', {'message': "Erreur : Partie ou joueur introuvable."})
+        return
 
-        # Envoyez uniquement aux Loups-Garous
-        emit('message', {
-            'username': username,
-            'message': message,
-            'role': player.role,  # Indique le rôle pour le filtrage côté client
-            'timestamp': datetime.utcnow().strftime('%H:%M:%S')
-        }, room=f'werewolf_chat_{game_id}')
-    else:
-        # Discussion ouverte pour tout le monde pendant le jour
-        emit('message', {
-            'username': username,
-            'message': message,
-            'role': player.role,
-            'timestamp': datetime.utcnow().strftime('%H:%M:%S')
-        }, room=room)
+    # Phase de nuit : seuls les Loups-Garous peuvent parler
+    if game.current_phase == 'night' and player.role != "Loup-Garou":
+        emit('error', {'message': "Vous ne pouvez pas parler pendant la nuit."}, room=room)
+        return
+
+    # Émettre le message à tous les joueurs dans la salle
+    emit('message', {
+        'username': username,
+        'message': message if message else "Message non disponible",
+        'role': player.role,
+        'timestamp': datetime.utcnow().strftime('%H:%M:%S')
+    }, room=room)
+
+@socketio.on('join')
+def on_join(data):
+    username = session.get('username', "Utilisateur inconnu")
+    room = data.get('room')
+
+    if not room:
+        return
+
+    join_room(room)
+    emit('message', {
+        'username': "Système",
+        'message': f"{username} a rejoint la partie.",
+        'timestamp': datetime.utcnow().strftime('%H:%M:%S')
+    }, room=room)
 
 
 
@@ -416,6 +442,9 @@ def handle_leave(data):
     room = data['room']
     leave_room(room)
     send(f"{username} a quitté la salle.", to=room)
+
+
+
 
 
 @app.route('/game/<int:game_id>')
@@ -430,19 +459,22 @@ def game_page(game_id):
         {
             "id": player.id,
             "user_id": player.user_id,
-            "username": player.user.username if player.user else "Utilisateur inconnu"
+            "username": player.user.username if player.user else "Utilisateur inconnu",
+            "role": player.role  # Ajout du rôle pour chaque joueur
         }
         for player in game.players
     ]
 
-    # Exemple de rôles (assurez-vous que vos rôles sont également sérialisables)
+    # Trouver le joueur actuel
+    current_player = Player.query.filter_by(user_id=session['user_id'], game_id=game_id).first()
+
+    # Exemple de rôles pour le template
     roles = [
-        {"player_id": role.player_id, "role": role.role}
-        for role in game.roles
-    ] if hasattr(game, "roles") else []
+        {"player_id": player.user_id, "role": player.role}
+        for player in game.players
+    ]
 
-    return render_template('game.html', game=game, players=players, roles=roles)
-
+    return render_template('game.html', game=game, players=players, roles=roles, player=current_player)
 
 votes = {}  # Dictionnaire pour stocker les votes
 
@@ -457,30 +489,38 @@ def handle_vote(data):
 
     # Obtenir l'ID du jeu à partir de la salle
     game_id = room.split('_')[1]
+    game = Game.query.filter_by(id=game_id).first()
     player = Player.query.filter_by(user_id=session['user_id'], game_id=game_id).first()
+
+    # Vérifiez que nous sommes en phase de jour pour voter
+    if game.current_phase != 'day':
+        emit('error', {'message': "Les votes ne sont autorisés que pendant la journée."})
+        return
 
     # Vérifiez si le joueur qui vote est éliminé
     if player and player.eliminated:
         emit('error', {'message': "Vous êtes éliminé et ne pouvez pas voter."})
         return
 
+    # Initialisez les votes pour cette salle si nécessaire
     if room not in votes:
         votes[room] = {}
 
-    # Ajouter le vote
+    # Ajoutez ou mettez à jour le vote
     if voted_user_id in votes[room]:
         votes[room][voted_user_id] += 1
     else:
         votes[room][voted_user_id] = 1
 
     # Vérifiez si tous les joueurs actifs ont voté
-    game = Game.query.filter_by(id=game_id).first()
     active_players = Player.query.filter_by(game_id=game.id, eliminated=False).all()
-    if game and len(votes[room]) == len(active_players):
+    if len(votes[room]) == len(active_players):
         # Trouver le joueur avec le plus de votes
         max_votes = max(votes[room].values())
         tied_players = [user_id for user_id, vote_count in votes[room].items() if vote_count == max_votes]
-        eliminated_player_id = random.choice(tied_players)  # Choisir aléatoirement en cas d'égalité
+
+        # Gérer une égalité en choisissant aléatoirement parmi les joueurs avec le plus de votes
+        eliminated_player_id = random.choice(tied_players)
 
         # Marquer le joueur comme éliminé
         eliminated_player = Player.query.filter_by(user_id=eliminated_player_id, game_id=game.id).first()
@@ -493,11 +533,11 @@ def handle_vote(data):
                 'eliminatedPlayer': eliminated_player.user.username
             }, room=room)
 
-        # Réinitialisez les votes pour la prochaine phase
+        # Réinitialisez les votes
         votes[room] = {}
 
         # Transition vers la phase suivante
-        game.current_phase = 'night' if game.current_phase == 'day' else 'day'
+        game.current_phase = 'night'  # La phase suivante est toujours la nuit après un vote
         game.phase_start_time = datetime.utcnow()
         db.session.commit()
 
@@ -506,6 +546,18 @@ def handle_vote(data):
             'game_id': game.id,
             'new_phase': game.current_phase
         }, to=room)
+    if eliminated_player.lover_id:
+        lover = Player.query.filter_by(user_id=eliminated_player.lover_id, game_id=game.id).first()
+        if lover:
+            lover.eliminated = True
+            db.session.commit()
+            # Notifiez les joueurs
+            socketio.emit('lover_died', {
+                'lover': lover.user.username,
+                'reason': f"{eliminated_player.user.username} a été éliminé(e)."
+            }, room=f"game_{game_id}")
+
+
 
 
 
@@ -516,22 +568,26 @@ def start_game(game_id):
         flash("La partie n'existe pas.", "danger")
         return redirect(url_for('home'))
 
-    game.started = True
-    game.discussion_start_time = datetime.utcnow()  # Enregistrez l'heure de début
+    # Récupérer les joueurs de la partie
+    players = Player.query.filter_by(game_id=game_id).all()
+
+    # Vérifier qu'il y a suffisamment de joueurs
+
+    # Attribuer des rôles aux joueurs
+    assign_roles(players)
     db.session.commit()
 
+    # Démarrer la partie
+    game.started = True
+    game.current_phase = 'night'  # La phase commence par la nuit
+    game.discussion_start_time = datetime.utcnow()  # Enregistrez l'heure de début de la phase
+    db.session.commit()
+
+    # Notifier les joueurs que la partie a commencé
     socketio.emit('start_game', {'game_id': game_id}, to=f'game_{game_id}')
     flash("La partie a démarré !", "success")
     return redirect(url_for('game_page', game_id=game_id))
 
-    game.started = True
-    db.session.commit()
-
-    # Émettre un événement Socket.IO
-    socketio.emit('start_game', {'game_id': game_id}, to=f'game_{game_id}')
-
-    flash("La partie a démarré !", "success")
-    return redirect(url_for('game_page', game_id=game_id))
 
 
 
@@ -633,13 +689,15 @@ def leave_game():
 def game_timer(game_id):
     game = Game.query.get(game_id)
     if not game or not game.started or not game.discussion_start_time:
-        return {"remaining_time": 300}  # Default 5 minutes
+        return {"remaining_time": game.day_phase_duration if game else 300}
 
     current_time = datetime.utcnow()
     elapsed_seconds = (current_time - game.discussion_start_time).total_seconds()
-    remaining_time = max(300 - int(elapsed_seconds), 0)  # Ensure we don't go negative
+    remaining_time = max(game.day_phase_duration - int(elapsed_seconds), 0)
     
     return {"remaining_time": remaining_time}
+
+
 
 @app.route('/game/<int:game_id>/next_phase', methods=['POST'])
 def next_phase(game_id):
@@ -659,29 +717,52 @@ def get_next_phase(current_phase):
     next_phase_index = (phases.index(current_phase) + 1) % len(phases)
     return phases[next_phase_index]
 
+from threading import Timer
 def transition_phase(game):
-    active_players = Player.query.filter_by(game_id=game.id, eliminated=False).all()
-
-    # Vérifiez si le jeu peut continuer (au moins 2 joueurs actifs)
-    if len(active_players) < 2:
-        game.current_phase = 'game_over'
-        db.session.commit()
-        socketio.emit('game_over', {'winner': 'Loups-Garous' if any(player.role == 'Loup-Garou' for player in active_players) else 'Villageois'}, to=f'game_{game.id}')
-        return
-
-    # Passez à la phase suivante
     if game.current_phase == 'night':
+        # Passez à la phase de jour
         game.current_phase = 'day'
+        notification = "La journée commence. Discutez et votez pour éliminer un suspect."
+
+        # Appliquez l'élimination
+        if game.target_id:
+            target_player = Player.query.filter_by(user_id=game.target_id, game_id=game.id).first()
+            if target_player and not target_player.eliminated:
+                target_player.eliminated = True
+                db.session.commit()
+
+                # Notifiez les joueurs
+                socketio.emit('elimination', {
+                    'victim': target_player.user.username,
+                    'message': f"{target_player.user.username} a été éliminé cette nuit par les Loups-Garous.",
+                    'timestamp': datetime.utcnow().strftime('%H:%M:%S')
+                }, room=f'game_{game.id}')
+
+            # Réinitialisez la cible
+            game.target_id = None
     else:
+        # Passez à la phase de nuit
         game.current_phase = 'night'
+        notification = "C'est la nuit. Les Loups-Garous se réveillent et choisissent une victime."
+
     game.phase_start_time = datetime.utcnow()
     db.session.commit()
 
-    # Notifiez les joueurs
+    # Notifiez les joueurs de la nouvelle phase
     socketio.emit('phase_change', {
         'game_id': game.id,
-        'new_phase': game.current_phase
+        'new_phase': game.current_phase,
+        'notification': notification
     }, to=f'game_{game.id}')
+
+
+
+
+
+def end_night_phase(game_id):
+    game = Game.query.get(game_id)
+    if game and game.current_phase == 'night':
+        transition_phase(game)  # Passez automatiquement à la phase suivante
 
 
 
@@ -725,6 +806,50 @@ def end_voting(game_id):
 
     return redirect(url_for('game_page', game_id=game_id))
 
+@app.route('/seer_action/<int:game_id>', methods=['POST'])
+def seer_action(game_id):
+    game = Game.query.get(game_id)
+    if not game:
+        flash("La partie n'existe pas.", "danger")
+        return redirect(url_for('home'))
+
+    player = Player.query.filter_by(user_id=session['user_id'], game_id=game_id).first()
+
+    # Vérifier si le joueur est bien la Voyante
+    if not player or player.role != "Voyante":
+        flash("Vous n'êtes pas autorisé à effectuer cette action.", "danger")
+        return redirect(url_for('game_page', game_id=game_id))
+
+    # Vérifiez si c'est la phase de nuit
+    if game.current_phase != 'night':
+        flash("Vous ne pouvez utiliser votre pouvoir que pendant la nuit.", "danger")
+        return redirect(url_for('game_page', game_id=game_id))
+
+    # Vérifier si la Voyante a déjà utilisé son pouvoir
+    if player.seer_used:
+        flash("Vous avez déjà utilisé votre pouvoir cette nuit.", "danger")
+        return redirect(url_for('game_page', game_id=game_id))
+
+    # Récupérer l'ID du joueur cible
+    target_id = request.form.get('target_id')
+    target_player = Player.query.filter_by(user_id=target_id, game_id=game_id).first()
+
+    if not target_player:
+        flash("Le joueur sélectionné n'existe pas.", "danger")
+        return redirect(url_for('game_page', game_id=game_id))
+
+    # Récupérer le rôle initial du joueur cible
+    observed_role = target_player.role
+
+    # Enregistrer que la Voyante a utilisé son pouvoir cette nuit
+    player.seer_used = True
+    db.session.commit()
+
+    # Retourner le rôle observé à la Voyante
+    flash(f"Le rôle de {target_player.user.username} est {observed_role}.", "info")
+    return redirect(url_for('game_page', game_id=game_id))
+
+
 @socketio.on('choose_victim')
 def choose_victim(data):
     game_id = data.get('game_id')
@@ -752,7 +877,103 @@ def choose_victim(data):
         # Passez à la phase suivante (jour)
         transition_phase(game)
 
+        
+@app.route('/werewolf_action/<int:game_id>', methods=['POST'])
+def werewolf_action(game_id):
+    game = Game.query.get(game_id)
+    player = Player.query.filter_by(user_id=session['user_id'], game_id=game_id).first()
 
+    if not game or not player or player.role != "Loup-Garou":
+        flash("Action non autorisée.", "danger")
+        return redirect(url_for('game_page', game_id=game_id))
+
+    if game.current_phase != 'night':
+        flash("Vous ne pouvez agir que pendant la nuit.", "danger")
+        return redirect(url_for('game_page', game_id=game_id))
+
+    # Enregistrez la victime choisie
+    target_id = request.form.get('target_id')
+    target_player = Player.query.filter_by(user_id=target_id, game_id=game_id).first()
+
+    if not target_player or target_player.eliminated:
+        flash("La cible est invalide ou déjà éliminée.", "danger")
+        return redirect(url_for('game_page', game_id=game_id))
+
+    # Sauvegardez la cible dans le jeu
+    game.target_id = target_id
+    db.session.commit()
+
+    # Notifiez les Loups-Garous de la sélection
+    socketio.emit('werewolf_action', {
+        'victim': target_player.user.username,
+        'timestamp': datetime.utcnow().strftime('%H:%M:%S')
+    }, room=f'werewolf_chat_{game_id}')
+
+    flash(f"{target_player.user.username} a été choisi comme cible.", "success")
+    return redirect(url_for('game_page', game_id=game_id))
+
+
+@app.route('/sorceress_action/<int:game_id>', methods=['POST'])
+def sorceress_action(game_id):
+    game = Game.query.get(game_id)
+    player = Player.query.filter_by(user_id=session['user_id'], game_id=game_id).first()
+
+    if not player or player.role != "Sorcière":
+        flash("Vous n'êtes pas autorisé à effectuer cette action.", "danger")
+        return redirect(url_for('game_page', game_id=game_id))
+
+    action = request.form.get('action')  # 'heal' ou 'poison'
+    target_id = request.form.get('target_id')
+
+    if action == 'heal' and not player.potion_heal_used:
+        target_player = Player.query.filter_by(user_id=target_id, game_id=game_id).first()
+        if target_player and target_player.eliminated:
+            target_player.eliminated = False
+            player.potion_heal_used = True
+            db.session.commit()
+            flash(f"Vous avez sauvé {target_player.user.username}.", "success")
+
+    elif action == 'poison' and not player.potion_poison_used:
+        target_player = Player.query.filter_by(user_id=target_id, game_id=game_id).first()
+        if target_player and not target_player.eliminated:
+            target_player.eliminated = True
+            player.potion_poison_used = True
+            db.session.commit()
+            flash(f"Vous avez empoisonné {target_player.user.username}.", "danger")
+
+    else:
+        flash("Action non autorisée ou potion déjà utilisée.", "danger")
+
+    return redirect(url_for('game_page', game_id=game_id))
+
+
+
+@app.route('/cupid_action/<int:game_id>', methods=['POST'])
+def cupid_action(game_id):
+    game = Game.query.get(game_id)
+    player = Player.query.filter_by(user_id=session['user_id'], game_id=game_id).first()
+
+    if not player or player.role != "Cupidon":
+        flash("Vous n'êtes pas autorisé à effectuer cette action.", "danger")
+        return redirect(url_for('game_page', game_id=game_id))
+
+    lover1_id = request.form.get('lover1_id')
+    lover2_id = request.form.get('lover2_id')
+
+    if not lover1_id or not lover2_id or lover1_id == lover2_id:
+        flash("Sélection invalide. Veuillez choisir deux joueurs différents.", "danger")
+        return redirect(url_for('game_page', game_id=game_id))
+
+    lover1 = Player.query.filter_by(user_id=lover1_id, game_id=game_id).first()
+    lover2 = Player.query.filter_by(user_id=lover2_id, game_id=game_id).first()
+
+    if lover1 and lover2:
+        lover1.lover_id = lover2.user_id
+        lover2.lover_id = lover1.user_id
+        db.session.commit()
+        flash(f"{lover1.user.username} et {lover2.user.username} sont maintenant amoureux !", "success")
+
+    return redirect(url_for('game_page', game_id=game_id))
 
 
 

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Créer une partie</title>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="/styles/main.css">
 </head>
 <body>
     <div class="content">
@@ -19,15 +19,55 @@
                 </div>
             {% endif %}
         {% endwith %}
-        <form method="POST">
-            <label for="game_name">Nom de la partie :</label>
-            <input type="text" id="game_name" name="game_name" placeholder="Nom de la partie" required><br>
-
-            <label for="max_players">Nombre maximum de joueurs :</label>
-            <input type="number" id="max_players" name="max_players" placeholder="Par exemple : 8" min="2" max="20" required><br>
-
-            <button type="submit">Créer la partie</button>
+        <form method="POST" action="{{ url_for('create_game') }}">
+            <h2>Informations de la Partie</h2>
+            <label for="game_name">Nom de la Partie :</label>
+            <input type="text" id="game_name" name="game_name" required>
+        
+            <label for="max_players">Nombre Maximum de Joueurs :</label>
+            <input type="number" id="max_players" name="max_players" min="2" required>
+        
+            <h2>Rôles Inclus</h2>
+            <label>
+                <input type="checkbox" name="roles" value="Loup-Garou" checked>
+                Loup-Garou
+            </label>
+            <label>
+                <input type="checkbox" name="roles" value="Voyante" checked>
+                Voyante
+            </label>
+            <label>
+                <input type="checkbox" name="roles" value="Sorcière" checked>
+                Sorcière
+            </label>
+            <label>
+                <input type="checkbox" name="roles" value="Cupidon" checked>
+                Cupidon
+            </label>
+        
+            <h2>Nombre de Joueurs par Rôle</h2>
+            <label for="num_werewolves">Loup-Garous :</label>
+            <input type="number" id="num_werewolves" name="num_werewolves" min="1" required>
+        
+            <label for="num_villagers">Villageois :</label>
+            <input type="number" id="num_villagers" name="num_villagers" min="1" required>
+        
+            <label for="num_special_roles">Rôles Spéciaux :</label>
+            <input type="number" id="num_special_roles" name="num_special_roles" min="1" required>
+        
+            <h2>Activer/Désactiver les Mécaniques</h2>
+            <label>
+                <input type="checkbox" name="mechanics" value="amour" checked>
+                Activer la mécanique d'amour (Cupidon)
+            </label>
+            <label>
+                <input type="checkbox" name="mechanics" value="sorceress_powers" checked>
+                Activer les pouvoirs de la Sorcière
+            </label>
+        
+            <button type="submit" class="button">Créer la Partie</button>
         </form>
+        
         <p style="text-align: center; margin-top: 10px;">
             <a href="{{ url_for('home') }}" style="color: #007bff; text-decoration: none;">Retour à l'accueil</a>
         </p>

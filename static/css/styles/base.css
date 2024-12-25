@@ -1,0 +1,31 @@
+/* Base styles and resets */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Gothic', 'Times New Roman', serif;
+  line-height: 1.6;
+  min-height: 100vh;
+  transition: background-image 1s ease-in-out;
+}
+
+/* Theme transitions */
+body.day {
+  background-image: url("/static/images/village.jpeg");
+  color: #2c3e50;
+}
+
+body.night {
+  background-image: url("/static/images/foret.jpeg");
+  color: #ecf0f1;
+}
+
+body.day, body.night {
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  backdrop-filter: blur(3px);
+}

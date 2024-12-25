@@ -30,7 +30,7 @@ class Game(db.Model):
     players = db.relationship('Player', backref='game', lazy=True)
     current_phase = db.Column(db.String(50), default='night')  # Par défaut à "nuit"
     phase_start_time = db.Column(db.DateTime, nullable=True)
-
+    day_phase_duration = db.Column(db.Integer, default=300)  # Duration in seconds, default 5 minutes
 
     def get_remaining_time(self):
         if self.discussion_start_time:
@@ -57,20 +57,46 @@ class Player(db.Model):
     user = db.relationship('User', backref='players', lazy=True)  # Relation avec User
     eliminated = db.Column(db.Boolean, default=False)  # Nouveau champ pour l'élimination
     role = db.Column(db.String(50), nullable=False)  # Exemples : "Loup-Garou", "Villageois"
+    potion_heal_used = db.Column(db.Boolean, default=False)  # Indique si la potion de soin est utilisée
+    potion_poison_used = db.Column(db.Boolean, default=False)  # Indique si la potion de poison est utilisée
+    lover_id = db.Column(db.Integer, nullable=True)  # L'ID de l'autre amoureux (si applicable)
+    seer_used = db.Column(db.Boolean, default=False)  # Voyante : a-t-elle utilisé son pouvoir ?
     def __repr__(self):
         return f'<Player User: {self.user_id} in Game: {self.game_id}>'
     
 import random
 
 def assign_roles(players):
-    roles = ['Loup-Garou', 'Voyante', 'Villageois']  # Exemple de rôles
-    role_distribution = random.choices(roles, k=len(players))
-    
-    assigned_roles = []
-    for player, role in zip(players, role_distribution):
-        assigned_roles.append({'player_id': player.user_id, 'role': role})
-    
-    return assigned_roles
+
+    roles = []
+
+    # Toujours inclure un Loup-Garou et un Villageois
+    roles.append('Loup-Garou')
+    roles.append('Villageois')
+
+    # Calculer le reste des rôles
+    num_werewolves = max(1, (len(players) - 2) // 4)  # Exemple : 1 Loup-Garou pour 4 joueurs restants
+    num_seer = min(1, len(players) - len(roles))  # 1 Voyante si possible
+    num_sorceress = min(1, len(players) - len(roles))  # 1 Sorcière si possible
+    num_cupid = min(1, len(players) - len(roles))  # 1 Cupidon si possible
+    num_villagers = len(players) - len(roles) - num_werewolves - num_seer - num_sorceress - num_cupid
+
+    # Ajouter les rôles restants
+    roles.extend(['Loup-Garou'] * num_werewolves)
+    roles.extend(['Voyante'] * num_seer)
+    roles.extend(['Sorcière'] * num_sorceress)
+    roles.extend(['Cupidon'] * num_cupid)
+    roles.extend(['Villageois'] * num_villagers)
+
+    # Mélanger les rôles pour les distribuer aléatoirement
+    random.shuffle(roles)
+
+    # Assigner les rôles aux joueurs
+    for player, role in zip(players, roles):
+        player.role = role
+
+
+
 
 
 
