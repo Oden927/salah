@@ -34,44 +34,53 @@
             </div>
         </div>
     </div>
+    <p id="phase">Phase actuelle : {{ game.current_phase }}</p>
 
     <script>
-        const socket = io();
-
+       const socket = io();
         const username = "{{ session['username'] }}";
         const room = "game_{{ game.id }}";
-        let discussionTime = 0; // Temps restant sera mis à jour depuis le serveur
+        let timerInterval;
 
-        // Rejoindre la salle
+        // Join room
         socket.emit('join', { username: username, room: room });
 
-        // Récupérer le temps restant depuis le serveur
-        fetch(`/game_timer/{{ game.id }}`)
-            .then(response => response.json())
-            .then(data => {
-                discussionTime = data.remaining_time; // Synchroniser avec le serveur
-                startDiscussion();
-            })
-            .catch(error => {
-                console.error("Erreur lors de la récupération du temps :", error);
-            });
-
-        // Minuteur de discussion
-        function startDiscussion() {
+        function updateTimer(remainingTime) {
             const timerDisplay = document.getElementById('timer');
-            const timerInterval = setInterval(() => {
-                if (discussionTime > 0) {
-                    const minutes = Math.floor(discussionTime / 60);
-                    const seconds = discussionTime % 60;
-                    timerDisplay.textContent = `Temps restant : ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-                    discussionTime--;
-                } else {
-                    clearInterval(timerInterval);
-                    startVoting(); // Transition vers la phase de vote
-                }
-            }, 1000);
+            const minutes = Math.floor(remainingTime / 60);
+            const seconds = remainingTime % 60;
+            timerDisplay.textContent = `Temps restant : ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+            
+            if (remainingTime <= 0) {
+                clearInterval(timerInterval);
+                startVoting();
+            }
         }
 
+        function initializeTimer() {
+            // Initial timer fetch
+            fetch(`/game_timer/{{ game.id }}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateTimer(data.remaining_time);
+                    
+                    // Set up periodic updates
+                    timerInterval = setInterval(() => {
+                        fetch(`/game_timer/{{ game.id }}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                updateTimer(data.remaining_time);
+                            })
+                            .catch(console.error);
+                    }, 1000);
+                })
+                .catch(console.error);
+        }
+
+        // Initialize timer when page loads
+        initializeTimer();
+
+        // Rest of the code remains the same
         // Phase de vote
         function startVoting() {
             document.getElementById('chat').style.display = 'none';
@@ -108,11 +117,62 @@
 
         sendButton.addEventListener('click', () => {
             const message = messageBox.value.trim();
+            const phase = "{{ game.current_phase }}";  // Phase actuelle depuis le serveur
+            const role = "{{ player.role }}";  // Rôle du joueur actuel
+
             if (message) {
+                // Pendant la nuit, seuls les Loups-Garous peuvent envoyer des messages
+                if (phase === "night" && role !== "Loup-Garou") {
+                    alert("Vous ne pouvez pas parler pendant la nuit !");
+                    return;
+                }
+
                 socket.emit('message', { username: username, message: message, room: room });
                 messageBox.value = '';
             }
         });
+
+        // Réception des messages
+        socket.on('message', (data) => {
+            const phase = "{{ game.current_phase }}";
+            const role = "{{ player.role }}";
+
+            // Pendant la nuit, seuls les Loups-Garous voient les messages de leur chat
+            if (phase === "night" && role !== "Loup-Garou" && data.role === "Loup-Garou") {
+                return; // Ignorer les messages de la discussion des Loups-Garous
+            }
+
+            // Afficher le message
+            const msg = document.createElement('div');
+            msg.classList.add('message-block');
+            msg.innerHTML = `
+                <div class="message-header">
+                    <strong>${data.username || "Utilisateur inconnu"}</strong>
+                    <span>${data.timestamp || new Date().toLocaleTimeString()}</span>
+                </div>
+                <div class="message-content">${data.message || "Message non disponible"}</div>
+            `;
+            messagesDiv.appendChild(msg);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        });
+
+
+
+
+        socket.on('phase_change', (data) => {
+            if (data.game_id == "{{ game.id }}") {
+                const phaseElement = document.getElementById('phase');
+                phaseElement.textContent = `Phase actuelle : ${data.new_phase}`;
+
+                if (data.new_phase === 'night') {
+                    alert("C'est la nuit. Les Loups-Garous agissent.");
+                } else if (data.new_phase === 'day') {
+                    alert("C'est le jour. Les joueurs peuvent voter.");
+                    startVoting();  // Démarrer la phase de vote
+                }
+            }
+        });
+
 
         socket.on('message', (data) => {
             const msg = document.createElement('div');
@@ -128,5 +188,6 @@
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         });
     </script>
+
 </body>
 </html>

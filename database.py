@@ -28,9 +28,16 @@ class Game(db.Model):
     discussion_start_time = db.Column(db.DateTime, nullable=True)
     # Relation avec les joueurs
     players = db.relationship('Player', backref='game', lazy=True)
+    current_phase = db.Column(db.String(50), default='night')  # Par défaut à "nuit"
+    phase_start_time = db.Column(db.DateTime, nullable=True)
 
 
-
+    def get_remaining_time(self):
+        if self.discussion_start_time:
+            elapsed_time = datetime.utcnow() - self.discussion_start_time
+            remaining_time = max(300 - elapsed_time.total_seconds(), 0)  # 300 secondes = 5 minutes
+            return int(remaining_time)
+        return 300
     def get_host(self):
         # Vérifiez les joueurs et retournez le premier joueur comme hôte
         first_player = Player.query.filter_by(game_id=self.id).order_by(Player.id).first()
@@ -48,7 +55,8 @@ class Player(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     game_id = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=False)
     user = db.relationship('User', backref='players', lazy=True)  # Relation avec User
-
+    eliminated = db.Column(db.Boolean, default=False)  # Nouveau champ pour l'élimination
+    role = db.Column(db.String(50), nullable=False)  # Exemples : "Loup-Garou", "Villageois"
     def __repr__(self):
         return f'<Player User: {self.user_id} in Game: {self.game_id}>'
     
