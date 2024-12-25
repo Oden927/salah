@@ -24,29 +24,30 @@ class Game(db.Model):
     max_players = db.Column(db.Integer, nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     started = db.Column(db.Boolean, default=False)
-    players = db.relationship('Player', backref='game', cascade="all, delete-orphan", lazy=True)
     discussion_start_time = db.Column(db.DateTime, nullable=True)
-    # Relation avec les joueurs
-    players = db.relationship('Player', backref='game', lazy=True)
-    current_phase = db.Column(db.String(50), default='night')  # Par défaut à "nuit"
+    target_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=True)
+    current_phase = db.Column(db.String(50), default='night')
     phase_start_time = db.Column(db.DateTime, nullable=True)
-    day_phase_duration = db.Column(db.Integer, default=300)  # Duration in seconds, default 5 minutes
+    day_phase_duration = db.Column(db.Integer, default=300)
+    night_phase_duration = db.Column(db.Integer, default=300)
+
+    # Relation corrigée
+    players = db.relationship('Player', backref='parent_game', foreign_keys='Player.game_id', lazy=True)
 
     def get_remaining_time(self):
         if self.discussion_start_time:
             elapsed_time = datetime.utcnow() - self.discussion_start_time
-            remaining_time = max(300 - elapsed_time.total_seconds(), 0)  # 300 secondes = 5 minutes
+            remaining_time = max(300 - elapsed_time.total_seconds(), 0)
             return int(remaining_time)
         return 300
+
     def get_host(self):
-        # Vérifiez les joueurs et retournez le premier joueur comme hôte
         first_player = Player.query.filter_by(game_id=self.id).order_by(Player.id).first()
         print(f"First player for Game {self.id}: {first_player.user_id if first_player else 'None'}")
         return first_player
-    
+
     def __repr__(self):
         return f'<Game {self.name}>'
-
 
 
 
@@ -54,17 +55,19 @@ class Player(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     game_id = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=False)
-    user = db.relationship('User', backref='players', lazy=True)  # Relation avec User
-    eliminated = db.Column(db.Boolean, default=False)  # Nouveau champ pour l'élimination
-    role = db.Column(db.String(50), nullable=False)  # Exemples : "Loup-Garou", "Villageois"
-    potion_heal_used = db.Column(db.Boolean, default=False)  # Indique si la potion de soin est utilisée
-    potion_poison_used = db.Column(db.Boolean, default=False)  # Indique si la potion de poison est utilisée
-    lover_id = db.Column(db.Integer, nullable=True)  # L'ID de l'autre amoureux (si applicable)
-    seer_used = db.Column(db.Boolean, default=False)  # Voyante : a-t-elle utilisé son pouvoir ?
+    user = db.relationship('User', backref='players', lazy=True)
+    eliminated = db.Column(db.Boolean, default=False)
+    role = db.Column(db.String(50), nullable=False)
+    potion_heal_used = db.Column(db.Boolean, default=False)
+    potion_poison_used = db.Column(db.Boolean, default=False)
+    lover_id = db.Column(db.Integer, nullable=True)
+    seer_used = db.Column(db.Boolean, default=False)
+
+    # Relation corrigée
+    game = db.relationship('Game', foreign_keys='Player.game_id')
+
     def __repr__(self):
         return f'<Player User: {self.user_id} in Game: {self.game_id}>'
-    night_phase_duration = db.Column(db.Integer, default=300)  # Par défaut : 5 minutes
-    day_phase_duration = db.Column(db.Integer, default=50)  # Par défaut : 5 minutes
 
 import random
 

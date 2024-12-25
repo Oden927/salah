@@ -16,7 +16,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 </head>
-<body class="day" id="game-body">
+<body id="game-body" class="{{ game.current_phase }}">
     <div class="content">
         <h1>Partie {{ game.name }}</h1>
         <p>Rôle attribué : 
@@ -154,6 +154,14 @@
             </form>
         </div>
         {% endif %}
+        {% if session['user_id'] == game.created_by %}
+        <div id="host-actions" class="host-actions">
+            <form method="POST" action="{{ url_for('next_phase', game_id=game.id) }}">
+                <button type="submit" class="button">Passer à la phase suivante</button>
+            </form>
+        </div>
+        {% endif %}
+
 
         <!-- Section de vote -->
         <div id="voting" style="display: none;">
@@ -245,16 +253,13 @@
         socket.on('phase_change', (data) => {
             if (data.game_id == "{{ game.id }}") {
                 const body = document.getElementById('game-body');
-                const phaseElement = document.getElementById('phase');
                 const transitionElement = document.getElementById('phase-transition');
 
-                // Mettre à jour la classe du body
-                body.className = data.new_phase;
+                // Mettre à jour la classe du body pour changer le fond
+                console.log("Changing phase to:", data.new_phase); // Debugging
+                body.className = data.new_phase; // Met la classe en fonction de la phase
 
-                // Mettre à jour le texte de la phase
-                phaseElement.textContent = `Phase actuelle : ${data.new_phase}`;
-
-                // Afficher une animation selon la phase
+                // Afficher une animation de transition
                 transitionElement.style.display = 'block';
                 transitionElement.textContent = data.new_phase === 'night' ? '🌙 La nuit tombe...' : '☀️ La journée commence...';
                 transitionElement.classList.add('fade-in');
@@ -263,16 +268,9 @@
                     transitionElement.classList.remove('fade-in');
                     transitionElement.style.display = 'none';
                 }, 3000);
-
-                if (data.new_phase === 'day') {
-                    document.getElementById('chat').style.display = 'block';
-                    document.getElementById('voting').style.display = 'block';
-                } else if (data.new_phase === 'night') {
-                    document.getElementById('chat').style.display = 'none';
-                    document.getElementById('voting').style.display = 'none';
-                }
             }
         });
+
         socket.on('seer_result', (data) => {
             alert(`Le rôle de ${data.username} est : ${data.role}`);
         });

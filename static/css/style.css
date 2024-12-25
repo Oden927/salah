@@ -100,6 +100,25 @@ body {
     border-radius: 5px;
     color: white;
 }
+.host-actions {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.host-actions .button {
+    padding: 10px 20px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+.host-actions .button:hover {
+    background-color: #2980b9;
+}
 
 .alert.success {
     background-color: #28a745;
@@ -410,7 +429,7 @@ form button:hover {
 }
 
 /* Phase de jour */
-body.night {
+body.day {
     background-image: url("/static/images/village.jpeg");
     background-size: cover;
     background-position: center;
@@ -419,7 +438,7 @@ body.night {
 }
 
 /* Phase de nuit */
-body.day {
+body.night {
     background-image: url("/static/images/foret.jpeg");
     background-size: cover;
     background-position: center;
