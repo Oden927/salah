@@ -32,8 +32,7 @@ class Game(db.Model):
     night_phase_duration = db.Column(db.Integer, default=300)
 
     # Relation corrigée
-    players = db.relationship('Player', backref='parent_game', foreign_keys='Player.game_id', lazy=True)
-
+    players = db.relationship('Player', backref='parent_game', foreign_keys='Player.game_id', lazy=True, overlaps="game")
     def get_remaining_time(self):
         if self.discussion_start_time:
             elapsed_time = datetime.utcnow() - self.discussion_start_time
@@ -64,8 +63,7 @@ class Player(db.Model):
     seer_used = db.Column(db.Boolean, default=False)
 
     # Relation corrigée
-    game = db.relationship('Game', foreign_keys='Player.game_id')
-
+    game = db.relationship('Game', foreign_keys='Player.game_id', overlaps="players,parent_game")
     def __repr__(self):
         return f'<Player User: {self.user_id} in Game: {self.game_id}>'
 

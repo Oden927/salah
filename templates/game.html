@@ -39,6 +39,19 @@
                 {% endif %}
             </span>
         </p>
+        <div id="voting" style="display: none;">
+            <h2>Votez pour éliminer un joueur</h2>
+            <div id="voting-options">
+                {% for player in players %}
+                    {% if not player.eliminated %}
+                        <button class="vote-button" onclick="castVote('{{ player.user_id }}')">
+                            {{ player.username }}
+                        </button>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        
         <p id="night-timer" style="display: none;">Temps restant pour la phase de nuit : 2:00</p>
 
         <!-- Conteneur pour les notifications -->
@@ -49,7 +62,7 @@
 
         <!-- Minuteur -->
         <p id="timer">Temps restant : 5:00</p>
-
+        {% if not player.eliminated %}
         <div id="chat" class="chat-container">
             <h2>Discussion</h2>
             {% if game.current_phase == 'night' and player.role == "Loup-Garou" %}
@@ -68,23 +81,21 @@
                 <button id="send" class="auth-button">Envoyer</button>
             {% endif %}
         </div>
-        
-
-        <!-- Actions spécifiques aux rôles -->
+        {% else %}
+        <p>Vous êtes éliminé et ne pouvez plus participer à la discussion.</p>
+        {% endif %}
         {% if player.role == 'Loup-Garou' and game.current_phase == 'night' %}
-        <div id="werewolf-action">
-            <h3>Les Loups-Garous agissent</h3>
-            <form method="POST" action="{{ url_for('werewolf_action', game_id=game.id) }}">
-                <label for="target_id">Choisissez une victime :</label>
-                <select name="target_id" id="target_id">
-                    {% for p in players %}
-                        {% if not p.eliminated and p.role != 'Loup-Garou' %}
-                            <option value="{{ p.user_id }}">{{ p.username }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-                <button type="submit" class="button">Valider</button>
-            </form>
+        <div id="werewolf-vote">
+            <h2>Votez pour choisir une victime</h2>
+            <div id="werewolf-voting-options">
+                {% for p in players %}
+                    {% if not p.eliminated and p.role != 'Loup-Garou' %}
+                        <button class="vote-button" onclick="castWerewolfVote('{{ p.user_id }}')">
+                            {{ p.username }}
+                        </button>
+                    {% endif %}
+                {% endfor %}
+            </div>
         </div>
         {% endif %}
         {% if player.role == 'Cupidon' %}
@@ -161,16 +172,33 @@
             </form>
         </div>
         {% endif %}
+        {% if session['user_id'] == game.created_by %}
+        <div id="end-phase" class="host-actions">
+            <form method="POST" action="{{ url_for('next_phase', game_id=game.id) }}">
+                <button type="submit" class="button">Terminer la phase</button>
+            </form>
+        </div>
+        {% endif %}
 
 
         <!-- Section de vote -->
-        <div id="voting" style="display: none;">
+        {% if not player.eliminated %}
+        <div id="voting">
             <h2>Votez pour éliminer un joueur</h2>
             <div id="voting-options">
-                <!-- Les options de vote seront générées ici -->
+                {% for p in players %}
+                    {% if not p.eliminated %}
+                        <button class="vote-button" onclick="castVote('{{ p.user_id }}')">
+                            {{ p.username }}
+                        </button>
+                    {% endif %}
+                {% endfor %}
             </div>
         </div>
-    </div>
+        {% else %}
+        <p>Vous êtes éliminé et ne pouvez plus voter.</p>
+        {% endif %}
+        
     <p id="phase">Phase actuelle : {{ game.current_phase }}</p>
 
     <script>
@@ -190,8 +218,7 @@
 
             if (remainingTime <= 0) {
                 clearInterval(timerInterval);
-                // Informer le backend que le temps est écoulé
-                fetch(`/game/${game.id}/next_phase`, {
+                fetch(`/game/{{ game.id }}/next_phase`, {
                     method: 'POST',
                 })
                 .then(response => {
@@ -202,15 +229,13 @@
             }
         }
 
-
         function initializeTimer() {
-            // Initial timer fetch
             fetch(`/game_timer/{{ game.id }}`)
                 .then(response => response.json())
                 .then(data => {
                     updateTimer(data.remaining_time);
-                    
-                    // Set up periodic updates
+
+                    // Redémarrez le timer à chaque seconde
                     timerInterval = setInterval(() => {
                         fetch(`/game_timer/{{ game.id }}`)
                             .then(response => response.json())
@@ -222,6 +247,7 @@
                 })
                 .catch(console.error);
         }
+
 
         // Initialize timer when page loads
         initializeTimer();
@@ -239,9 +265,8 @@
 
         // Casting a vote
         function castVote(votedUserId) {
-            socket.emit('vote', { room: room, votedUserId: votedUserId });
-        }
-
+        socket.emit('vote', { room: room, votedUserId: votedUserId });
+    }
         // Listen for vote results
         socket.on('vote_result', (data) => {
             alert(`${data.eliminatedPlayer} a été éliminé !`);
@@ -251,17 +276,41 @@
 
 
         socket.on('phase_change', (data) => {
+            if (data.new_phase === 'voting') {
+                document.getElementById('voting').style.display = 'block';
+                document.getElementById('chat').style.display = 'none';
+            } else {
+                document.getElementById('voting').style.display = 'none';
+                document.getElementById('chat').style.display = 'block';
+            }
             if (data.game_id == "{{ game.id }}") {
                 const body = document.getElementById('game-body');
                 const transitionElement = document.getElementById('phase-transition');
+                const votingDiv = document.getElementById('voting');
+                const chatDiv = document.getElementById('chat');
 
                 // Mettre à jour la classe du body pour changer le fond
                 console.log("Changing phase to:", data.new_phase); // Debugging
-                body.className = data.new_phase; // Met la classe en fonction de la phase
+                body.className = data.new_phase;
+
+                // Afficher ou cacher les sections selon la phase
+                if (data.new_phase === 'voting') {
+                    votingDiv.style.display = 'block';
+                    chatDiv.style.display = 'none';
+                } else if (data.new_phase === 'day') {
+                    votingDiv.style.display = 'none';
+                    chatDiv.style.display = 'block';
+                } else if (data.new_phase === 'night') {
+                    votingDiv.style.display = 'none';
+                    chatDiv.style.display = 'none';
+                }
 
                 // Afficher une animation de transition
                 transitionElement.style.display = 'block';
-                transitionElement.textContent = data.new_phase === 'night' ? '🌙 La nuit tombe...' : '☀️ La journée commence...';
+                transitionElement.textContent =
+                    data.new_phase === 'night' ? '🌙 La nuit tombe...' :
+                    data.new_phase === 'voting' ? '🗳️ Phase de vote...' :
+                    '☀️ La journée commence...';
                 transitionElement.classList.add('fade-in');
 
                 setTimeout(() => {
@@ -269,11 +318,18 @@
                     transitionElement.style.display = 'none';
                 }, 3000);
             }
+            if (data.game_id == "{{ game.id }}") {
+                clearInterval(timerInterval);
+                initializeTimer();
+            }
         });
+
 
         socket.on('seer_result', (data) => {
             alert(`Le rôle de ${data.username} est : ${data.role}`);
         });
+
+
 
 
 
@@ -314,6 +370,32 @@
             `;
             messagesDiv.appendChild(eliminationMessage);
             messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll automatique
+        });
+        socket.on('player_eliminated', (data) => {
+            const messagesDiv = document.getElementById('messages');
+            const eliminationMessage = document.createElement('div');
+            eliminationMessage.classList.add('elimination-message');
+            eliminationMessage.innerHTML = `
+                <strong>Système :</strong> ${data.eliminatedPlayer} a été éliminé. Raison : ${data.reason}.
+            `;
+            messagesDiv.appendChild(eliminationMessage);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll automatique
+        });
+        function castWerewolfVote(victimId) {
+            if (!victimId) {
+                alert("Erreur : Aucun joueur sélectionné.");
+                return;
+            }
+
+            socket.emit('werewolf_vote', {
+                room: `game_{{ game.id }}`,
+                victimId: victimId
+            });
+        }
+
+        socket.on('player_eliminated', (data) => {
+            alert(`${data.eliminatedPlayer} a été éliminé. Raison : ${data.reason}`);
+            location.reload(); // Rechargez la page pour refléter l'état mis à jour
         });
 
 

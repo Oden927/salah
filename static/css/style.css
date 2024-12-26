@@ -445,3 +445,36 @@ body.night {
     background-attachment: fixed;
     color: white; /* Texte lisible sur fond sombre */
 }
+.fade-in.night {
+    animation: fadeInNight 3s ease-in-out;
+}
+
+.fade-in.day {
+    animation: fadeInDay 3s ease-in-out;
+}
+
+@keyframes fadeInNight {
+    from { background-color: black; opacity: 0; }
+    to { background-color: midnightblue; opacity: 1; }
+}
+
+@keyframes fadeInDay {
+    from { background-color: white; opacity: 0; }
+    to { background-color: lightgoldenrodyellow; opacity: 1; }
+}
+
+
+#end-phase .button {
+    padding: 10px 20px;
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+#end-phase .button:hover {
+    background-color: #c0392b;
+}
