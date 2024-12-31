@@ -12,7 +12,12 @@ import os
 
 
 from dotenv import load_dotenv
+from threading import Lock
+
+phase_lock = Lock()
+
 load_dotenv()
+
 
 
 
@@ -604,6 +609,8 @@ def schedule_phase_end(game):
     db.session.commit()
 
     # Planifiez la fin de la phase
+    print(f"Phase {game.current_phase} planifiée pour se terminer dans {phase_duration} secondes pour le jeu {game.id}.")
+    print(f"Planification de la fin de la phase '{game.current_phase}' pour le jeu {game.id}. Durée : {phase_duration}s.")
     Timer(phase_duration, end_phase, [game.id]).start()
 
 def end_phase(game_id):
@@ -741,45 +748,56 @@ def leave_game():
 @app.route('/game_timer/<int:game_id>')
 def game_timer(game_id):
     game = Game.query.get(game_id)
-    if not game or not game.started or not game.discussion_start_time:
-        return {"remaining_time": game.day_phase_duration if game else 300}
+    if not game or not game.started or not game.phase_start_time:
+        print(f"Game {game_id} : Temps restant par défaut (300s).")
+        return {"remaining_time": 300}
 
     current_time = datetime.utcnow()
-    elapsed_seconds = (current_time - game.discussion_start_time).total_seconds()
-    remaining_time = max(game.day_phase_duration - int(elapsed_seconds), 0)
-    
+    elapsed_seconds = (current_time - game.phase_start_time).total_seconds()
+    phase_duration = {
+        'night': game.night_phase_duration,
+        'day': game.day_phase_duration,
+        'voting': 120  # Par défaut 2 minutes pour la phase de vote
+    }.get(game.current_phase, 300)  # Valeur par défaut si aucune phase ne correspond
+
+    remaining_time = max(phase_duration - int(elapsed_seconds), 0)
+    print(f"Game {game_id} : Temps restant calculé : {remaining_time}s pour la phase {game.current_phase}.")
     return {"remaining_time": remaining_time}
 
+
 def transition_phase(game):
-    if not game:
-        print("Erreur : La partie est introuvable.")
-        return
+    with phase_lock:
+        if not game:
+            print("Erreur : La partie est introuvable.")
+            return
 
-    print(f"Transition de phase pour la partie {game.id}. Phase actuelle : {game.current_phase}")
+        print(f"Transition de phase pour la partie {game.id}. Phase actuelle : {game.current_phase}")
 
-    if game.current_phase == 'night':
-        game.current_phase = 'day'
-        notification = "☀️ La journée commence. Les joueurs discutent."
-    elif game.current_phase == 'day':
-        game.current_phase = 'voting'
-        notification = "🗳️ Phase de vote. Les joueurs doivent voter pour éliminer un suspect."
-    elif game.current_phase == 'voting':
-        game.current_phase = 'night'
-        notification = "🌙 La nuit tombe. Les Loups-Garous se réveillent."
+        if game.current_phase == 'night':
+            game.current_phase = 'day'
+            notification = "☀️ La journée commence. Les joueurs discutent."
+        elif game.current_phase == 'day':
+            game.current_phase = 'voting'
+            notification = "🗳️ Phase de vote. Les joueurs doivent voter pour éliminer un suspect."
+        elif game.current_phase == 'voting':
+            game.current_phase = 'night'
+            notification = "🌙 La nuit tombe. Les Loups-Garous se réveillent."
 
-    # Mettez à jour la phase
-    game.phase_start_time = datetime.utcnow()
-    db.session.commit()
+        # Mettre à jour la phase et le temps de départ
+        game.phase_start_time = datetime.utcnow()
+        db.session.commit()
 
-    # Planifiez la fin de la nouvelle phase
-    schedule_phase_end(game)
+        # Planifiez la fin de la nouvelle phase
+        schedule_phase_end(game)
 
-    # Notifiez les joueurs de la nouvelle phase
-    socketio.emit('phase_change', {
-        'game_id': game.id,
-        'new_phase': game.current_phase,
-        'notification': notification
-    }, room=f"game_{game.id}")
+        # Notifiez les joueurs
+        socketio.emit('phase_change', {
+            'game_id': game.id,
+            'new_phase': game.current_phase,
+            'notification': notification
+        }, room=f"game_{game.id}")
+
+
 
 
 @app.route('/game/<int:game_id>/next_phase', methods=['POST'])
@@ -789,10 +807,17 @@ def next_phase(game_id):
         flash("La partie n'existe pas.", "danger")
         return redirect(url_for('home'))
 
-    # Vérifier que l'utilisateur est l'hôte
-    if session['user_id'] != game.created_by:
-        flash("Seul l'hôte peut passer à la phase suivante.", "danger")
-        return redirect(url_for('game_page', game_id=game_id))
+    # Vérifiez si la phase actuelle est encore en cours
+    elapsed_time = (datetime.utcnow() - game.phase_start_time).total_seconds()
+    phase_duration = {
+        'night': game.night_phase_duration,
+        'day': game.day_phase_duration,
+        'voting': 120  # Par défaut 2 minutes pour la phase de vote
+    }.get(game.current_phase, 120)
+
+    if elapsed_time < phase_duration:
+        print(f"Phase {game.current_phase} encore en cours pour la partie {game_id}. Ignorer l'appel.")
+        return "", 429  # Too Many Requests
 
     # Passer à la phase suivante
     transition_phase(game)
