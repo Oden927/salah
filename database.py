@@ -61,6 +61,7 @@ class Player(db.Model):
     potion_poison_used = db.Column(db.Boolean, default=False)
     lover_id = db.Column(db.Integer, nullable=True)
     seer_used = db.Column(db.Boolean, default=False)
+    action_used = db.Column(db.Boolean, default=False)
 
     # Relation corrigée
     game = db.relationship('Game', foreign_keys='Player.game_id', overlaps="players,parent_game")

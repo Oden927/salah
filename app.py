@@ -731,6 +731,9 @@ def remove_players_from_game(game_id):
     flash("Tous les joueurs ont été retirés de la partie.", "success")
     return redirect(url_for('home'))
 
+@app.route('/rules')
+def rules():
+    return render_template('rules.html')
 
 @app.route('/leave_game', methods=['POST'])
 def leave_game():
@@ -796,6 +799,9 @@ def transition_phase(game):
             game.current_phase = 'day'
             notification = "☀️ La journée commence. Les joueurs discutent."
         elif game.current_phase == 'day':
+            for player in game.players:
+                player.action_used = False
+                db.session.commit()
             game.current_phase = 'voting'
             notification = "🗳️ Phase de vote. Les joueurs doivent voter pour éliminer un suspect."
         elif game.current_phase == 'voting':
@@ -940,6 +946,11 @@ def seer_action(game_id):
         flash("Vous ne pouvez utiliser votre pouvoir que pendant la nuit.", "danger")
         return redirect(url_for('game_page', game_id=game_id))
 
+    # Vérifier si la voyante a déjà utilisé son pouvoir cette nuit
+    if player.action_used:
+        flash("Vous avez déjà utilisé votre pouvoir cette nuit.", "warning")
+        return redirect(url_for('game_page', game_id=game_id))
+
     # Récupérer l'ID du joueur sélectionné
     target_id = request.form.get('target_id')
     target_player = Player.query.filter_by(user_id=target_id, game_id=game_id).first()
@@ -948,9 +959,21 @@ def seer_action(game_id):
         flash("Le joueur sélectionné n'existe pas.", "danger")
         return redirect(url_for('game_page', game_id=game_id))
 
-    # Renvoyer le rôle observé
+    # Enregistrer que l'action a été utilisée
+    player.action_used = True
+    db.session.commit()
+
+    # Émettre un événement pour annoncer le rôle
+    role_message = f"La Voyante a inspecté {target_player.user.username}, son rôle est : {target_player.role}."
+    socketio.emit('seer_announcement', {
+        'message': role_message,
+        'game_id': game_id
+    }, room=f'game_{game_id}')
+
+    # Retourner le rôle au joueur (optionnel)
     flash(f"Le rôle de {target_player.user.username} est : {target_player.role}.", "info")
     return redirect(url_for('game_page', game_id=game_id))
+
 
 @socketio.on('seer_action')
 def handle_seer_action(data):
@@ -1089,10 +1112,17 @@ def cupid_action(game_id):
     game = Game.query.get(game_id)
     player = Player.query.filter_by(user_id=session['user_id'], game_id=game_id).first()
 
+    # Vérifier si le joueur est Cupidon
     if not player or player.role != "Cupidon":
         flash("Vous n'êtes pas autorisé à effectuer cette action.", "danger")
         return redirect(url_for('game_page', game_id=game_id))
 
+    # Vérifier si Cupidon a déjà utilisé son pouvoir
+    if player.action_used:
+        flash("Vous avez déjà utilisé votre pouvoir.", "warning")
+        return redirect(url_for('game_page', game_id=game_id))
+
+    # Récupérer les joueurs choisis
     lover1_id = request.form.get('lover1_id')
     lover2_id = request.form.get('lover2_id')
 
@@ -1103,13 +1133,30 @@ def cupid_action(game_id):
     lover1 = Player.query.filter_by(user_id=lover1_id, game_id=game_id).first()
     lover2 = Player.query.filter_by(user_id=lover2_id, game_id=game_id).first()
 
-    if lover1 and lover2:
-        lover1.lover_id = lover2.user_id
-        lover2.lover_id = lover1.user_id
-        db.session.commit()
-        flash(f"{lover1.user.username} et {lover2.user.username} sont maintenant amoureux !", "success")
+    if not lover1 or not lover2:
+        flash("Un ou plusieurs joueurs sélectionnés sont invalides.", "danger")
+        return redirect(url_for('game_page', game_id=game_id))
+
+    # Lier les amoureux
+    lover1.lover_id = lover2.user_id
+    lover2.lover_id = lover1.user_id
+
+    # Marquer l'action de Cupidon comme utilisée et changer son rôle en Villageois
+    player.action_used = True
+    player.role = "Villageois"
+    db.session.commit()
+
+    # Envoyer une notification à Cupidon
+    flash(f"{lover1.user.username} et {lover2.user.username} sont maintenant amoureux !", "success")
+
+    # Émettre une notification publique via Socket.IO
+    socketio.emit('cupid_announcement', {
+        'message': f"Cupidon a uni {lover1.user.username} et {lover2.user.username} !",
+        'game_id': game_id
+    }, room=f'game_{game_id}')
 
     return redirect(url_for('game_page', game_id=game_id))
+
 
 
 @app.route('/eliminated/<int:game_id>')

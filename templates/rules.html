@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Règles du Loup-Garou</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="navbar">
+        <div class="logo">Loup-Garou</div>
+        <div class="nav-links">
+            <a href="/">Accueil</a>
+            <a href="/rules" class="active">Règles</a>
+            <a href="/logout">Déconnexion</a>
+        </div>
+    </div>
+
+    <div class="content">
+        <h1>Règles du jeu Loup-Garou</h1>
+
+        <h2>Objectif du jeu</h2>
+        <p>Le but du jeu dépend de votre rôle :</p>
+        <ul>
+            <li><strong>Villageois :</strong> Éliminer tous les loups-garous.</li>
+            <li><strong>Loups-Garous :</strong> Éliminer tous les villageois.</li>
+            <li><strong>Personnages spéciaux :</strong> Suivre leurs objectifs uniques pour aider leur camp.</li>
+        </ul>
+
+        <h2>Déroulement d'une partie</h2>
+        <h3>1. Phase de nuit</h3>
+        <p>Les loups-garous choisissent une victime. Les personnages spéciaux (Voyante, Sorcière, etc.) peuvent utiliser leurs pouvoirs.</p>
+
+        <h3>2. Phase de jour</h3>
+        <p>Les joueurs discutent pour identifier les loups-garous et votent pour éliminer un suspect.</p>
+
+        <h2>Rôles disponibles</h2>
+        <ul>
+            <li><strong>Villageois :</strong> Aucun pouvoir spécial, doit voter stratégiquement.</li>
+            <li><strong>Loups-Garous :</strong> Se réunissent la nuit pour éliminer un joueur.</li>
+            <li><strong>Voyante :</strong> Peut connaître le rôle d'un joueur chaque nuit.</li>
+            <li><strong>Sorcière :</strong> Dispose d'une potion de vie et d'une potion de mort.</li>
+            <li><strong>Cupidon :</strong> Lie deux joueurs qui deviennent amoureux.</li>
+            <li><strong>Chasseur :</strong> Peut éliminer un joueur en mourant.</li>
+        </ul>
+
+        <h2>Conditions de victoire</h2>
+        <ul>
+            <li><strong>Villageois :</strong> Tous les loups-garous sont éliminés.</li>
+            <li><strong>Loups-Garous :</strong> Le nombre de loups-garous est égal ou supérieur à celui des villageois.</li>
+            <li><strong>Amoureux :</strong> Si tous les autres joueurs sont éliminés, les amoureux gagnent.</li>
+        </ul>
+    </div>
+</body>
+</html>

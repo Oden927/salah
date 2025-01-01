@@ -4,8 +4,8 @@
     <div class="navbar">
         <div class="logo">Loup-Garou</div>
         <div class="nav-links">
-            <a href="/home">Accueil</a>
-            <a href="/rules">Règles</a>
+            <a href="/">Accueil</a>
+            <a href="/rules" class="active">Règles</a>
             <a href="/logout">Déconnexion</a>
         </div>
     </div>    
@@ -105,27 +105,32 @@
         {% if player.role == 'Cupidon' %}
         <div id="cupid-action">
             <h3>Action de Cupidon</h3>
-            <form method="POST" action="{{ url_for('cupid_action', game_id=game.id) }}">
-                <label for="lover1_id">Choisissez le premier amoureux :</label>
-                <select name="lover1_id" id="lover1_id">
-                    {% for p in players %}
-                        {% if p.user_id != session['user_id'] and not p.eliminated %}
-                            <option value="{{ p.user_id }}">{{ p.username }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-                <label for="lover2_id">Choisissez le second amoureux :</label>
-                <select name="lover2_id" id="lover2_id">
-                    {% for p in players %}
-                        {% if p.user_id != session['user_id'] and not p.eliminated %}
-                            <option value="{{ p.user_id }}">{{ p.username }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-                <button type="submit" class="button">Valider</button>
-            </form>
+            {% if player.action_used %}
+                <p>Vous avez déjà utilisé votre pouvoir. Vous êtes maintenant un Villageois.</p>
+            {% else %}
+                <form method="POST" action="{{ url_for('cupid_action', game_id=game.id) }}">
+                    <label for="lover1_id">Choisissez le premier amoureux :</label>
+                    <select name="lover1_id" id="lover1_id">
+                        {% for p in players %}
+                            {% if p.user_id != session['user_id'] and not p.eliminated %}
+                                <option value="{{ p.user_id }}">{{ p.username }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    <label for="lover2_id">Choisissez le second amoureux :</label>
+                    <select name="lover2_id" id="lover2_id">
+                        {% for p in players %}
+                            {% if p.user_id != session['user_id'] and not p.eliminated %}
+                                <option value="{{ p.user_id }}">{{ p.username }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="button">Valider</button>
+                </form>
+            {% endif %}
         </div>
         {% endif %}
+
         
         {% if player.role == 'Sorcière' and game.current_phase == 'night' %}
         <div id="sorceress-action">
@@ -154,21 +159,26 @@
         {% endif %}
 
         {% if player.role == 'Voyante' and game.current_phase == 'night' %}
-        <div id="seer-action">
-            <h3>Action de la Voyante</h3>
-            <form method="POST" action="{{ url_for('seer_action', game_id=game.id) }}">
-                <label for="target_id">Choisissez un joueur :</label>
-                <select name="target_id" id="target_id">
-                    {% for p in players %}
-                        {% if p.user_id != session['user_id'] and not p.eliminated %}
-                            <option value="{{ p.user_id }}">{{ p.username }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-                <button type="submit" class="button">Utiliser votre pouvoir</button>
-            </form>
-        </div>
+            <div id="seer-action">
+                <h3>Action de la Voyante</h3>
+                {% if player.action_used %}
+                    <p>Vous avez déjà utilisé votre pouvoir cette nuit.</p>
+                {% else %}
+                    <form method="POST" action="{{ url_for('seer_action', game_id=game.id) }}">
+                        <label for="target_id">Choisissez un joueur :</label>
+                        <select name="target_id" id="target_id">
+                            {% for p in players %}
+                                {% if p.user_id != session['user_id'] and not p.eliminated %}
+                                    <option value="{{ p.user_id }}">{{ p.username }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="button">Utiliser votre pouvoir</button>
+                    </form>
+                {% endif %}
+            </div>
         {% endif %}
+
 
 
         <!-- Section de vote -->
@@ -317,12 +327,33 @@
             }  // Redémarrer le timer avec les nouvelles données
                     }
         });
+        socket.on('cupid_announcement', (data) => {
+            if (data.game_id == "{{ game.id }}") {
+                const notification = document.getElementById('notification');
+                notification.textContent = data.message;
+                notification.style.display = 'block';
 
-
-        socket.on('seer_result', (data) => {
-            alert(`Le rôle de ${data.username} est : ${data.role}`);
+                // Cache la notification après 5 secondes
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 5000);
+            }
         });
 
+
+       // Écouter l'annonce de la voyante
+        socket.on('seer_announcement', (data) => {
+            if (data.game_id == "{{ game.id }}") {
+                const notification = document.getElementById('notification');
+                notification.textContent = data.message;
+                notification.style.display = 'block';
+
+                // Cache le message après 5 secondes
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 5000);
+            }
+        });
 
 
 

@@ -13,9 +13,8 @@
     <div class="navbar">
         <div class="logo">Loup-Garou</div>
         <div class="nav-links">
-            <a href="#home">Accueil</a>
-            <a href="#about">À propos</a>
-            <a href="#rules">Règles</a>
+            <a href="/">Accueil</a>
+            <a href="/rules" class="active">Règles</a>
         </div>
         {% if session.get('username') %}
             <!-- Afficher le pseudo de l'utilisateur connecté -->
