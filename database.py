@@ -25,14 +25,17 @@ class Game(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     started = db.Column(db.Boolean, default=False)
     discussion_start_time = db.Column(db.DateTime, nullable=True)
-    target_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=True)
+    target_id = db.Column(
+        db.Integer,
+        db.ForeignKey('player.id', use_alter=True, name="fk_game_target_id"),
+        nullable=True
+    )
     current_phase = db.Column(db.String(50), default='night')
     phase_start_time = db.Column(db.DateTime, nullable=True)
     day_phase_duration = db.Column(db.Integer, default=300)
     night_phase_duration = db.Column(db.Integer, default=300)
 
-    # Relation corrigée
-    players = db.relationship('Player', backref='parent_game', foreign_keys='Player.game_id', lazy=True, overlaps="game")
+  
     def get_remaining_time(self):
         if self.discussion_start_time:
             elapsed_time = datetime.utcnow() - self.discussion_start_time
@@ -53,20 +56,40 @@ class Game(db.Model):
 class Player(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    game_id = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=False)
+    game_id = db.Column(
+        db.Integer,
+        db.ForeignKey('game.id', use_alter=True, name="fk_player_game_id"),
+        nullable=False
+    )
+    lover_id = db.Column(
+        db.Integer,
+        db.ForeignKey('player.id', use_alter=True, name="fk_player_lover_id"),
+        nullable=True
+    )
+
+    # Relations
     user = db.relationship('User', backref='players', lazy=True)
+    lover = db.relationship(
+        'Player',
+        remote_side=[id],
+        backref=db.backref('lovers', lazy=True)
+    )
+    game = db.relationship(
+        'Game',
+        backref=db.backref('players', lazy=True),
+        foreign_keys=[game_id]
+    )
+
     eliminated = db.Column(db.Boolean, default=False)
     role = db.Column(db.String(50), nullable=False)
     potion_heal_used = db.Column(db.Boolean, default=False)
     potion_poison_used = db.Column(db.Boolean, default=False)
-    lover_id = db.Column(db.Integer, nullable=True)
     seer_used = db.Column(db.Boolean, default=False)
     action_used = db.Column(db.Boolean, default=False)
 
-    # Relation corrigée
-    game = db.relationship('Game', foreign_keys='Player.game_id', overlaps="players,parent_game")
     def __repr__(self):
         return f'<Player User: {self.user_id} in Game: {self.game_id}>'
+
 
 import random
 
@@ -84,6 +107,7 @@ def assign_roles(players):
     num_sorceress = min(1, len(players) - len(roles))  # 1 Sorcière si possible
     num_cupid = min(1, len(players) - len(roles))  # 1 Cupidon si possible
     num_villagers = len(players) - len(roles) - num_werewolves - num_seer - num_sorceress - num_cupid
+    num_fool = min(1, len(players) - len(roles))  # Inclure le Fou
 
     # Ajouter les rôles restants
     roles.extend(['Loup-Garou'] * num_werewolves)
@@ -91,6 +115,7 @@ def assign_roles(players):
     roles.extend(['Sorcière'] * num_sorceress)
     roles.extend(['Cupidon'] * num_cupid)
     roles.extend(['Villageois'] * num_villagers)
+    roles.extend(['Fou'] * num_fool)  # Ajout du rôle Fou   
 
     # Mélanger les rôles pour les distribuer aléatoirement
     random.shuffle(roles)

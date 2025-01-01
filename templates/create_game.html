@@ -44,6 +44,10 @@
                 <input type="checkbox" name="roles" value="Cupidon" checked>
                 Cupidon
             </label>
+            <label>
+                <input type="checkbox" name="roles" value="Fou">
+                Fou
+            </label>
         
             <h2>Nombre de Joueurs par Rôle</h2>
             <label for="num_werewolves">Loup-Garous :</label>
@@ -72,6 +76,9 @@
             <a href="{{ url_for('home') }}" style="color: #007bff; text-decoration: none;">Retour à l'accueil</a>
         </p>
     </div>
+    <audio id="background-audio" autoplay loop>
+        <source src="{{ url_for('static', filename='audio/main.mp3') }}" type="audio/mpeg">
+        Votre navigateur ne supporte pas l'élément audio.
+    </audio>
 </body>
 </html>
-

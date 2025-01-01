@@ -33,6 +33,10 @@
         
         <p>Pas encore inscrit ? <a href="/register">Créer un compte</a></p>
     </div>
+    <audio id="background-audio" autoplay loop>
+        <source src="{{ url_for('static', filename='audio/main.mp3') }}" type="audio/mpeg">
+        Votre navigateur ne supporte pas l'élément audio.
+    </audio>
 </body>
 {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}

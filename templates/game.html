@@ -1,20 +1,23 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head>
-    <div class="navbar">
-        <div class="logo">Loup-Garou</div>
-        <div class="nav-links">
-            <a href="/">Accueil</a>
-            <a href="/rules" class="active">Règles</a>
-            <a href="/logout">Déconnexion</a>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Jeu en cours - Partie {{ game.name }}</title>
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+        <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+        <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    </head>
+    <body id="game-body" class="{{ game.current_phase }}">
+        <div class="navbar">
+            <div class="logo">Loup-Garou</div>
+            <div class="nav-links">
+                <a href="/">Accueil</a>
+                <a href="/rules" class="active">Règles</a>
+                <a href="/logout">Déconnexion</a>
+            </div>
         </div>
-    </div>    
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jeu en cours - Partie {{ game.name }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    
 </head>
 <body id="game-body" class="{{ game.current_phase }}">
     <div class="content">
@@ -22,23 +25,37 @@
         <p>Rôle attribué : 
             <span class="role-icon">
                 {% if player.role == 'Loup-Garou' %}
-                <img src="{{ url_for('static', filename='images/werewolf.png') }}" alt="Loup-Garou" class="role-image">
-                Loup-Garou
+                    <img src="{{ url_for('static', filename='images/werewolf.png') }}" alt="Loup-Garou" class="role-image">
+                    Loup-Garou
                 {% elif player.role == 'Voyante' %}
-                <img src="{{ url_for('static', filename='images/seer.png') }}" alt="Voyante" class="role-image">
-                Voyante
+                    <img src="{{ url_for('static', filename='images/seer.png') }}" alt="Voyante" class="role-image">
+                    Voyante
                 {% elif player.role == 'Sorcière' %}
-                <img src="{{ url_for('static', filename='images/sorceress.png') }}" alt="Sorcière" class="role-image">
-                Sorcière
+                    <img src="{{ url_for('static', filename='images/sorceress.png') }}" alt="Sorcière" class="role-image">
+                    Sorcière
                 {% elif player.role == 'Cupidon' %}
-                <img src="{{ url_for('static', filename='images/cupid.png') }}" alt="Cupidon" class="role-image">
-                Cupidon
+                    <img src="{{ url_for('static', filename='images/cupid.png') }}" alt="Cupidon" class="role-image">
+                    Cupidon
+                {% elif player.role == 'Fou' %}
+                    <img src="{{ url_for('static', filename='images/fou.png') }}" alt="Fou" class="role-image">
+                    Fou
                 {% else %}
-                <img src="{{ url_for('static', filename='images/villager.png') }}" alt="Villageois" class="role-image">
-                Villageois
+                    <img src="{{ url_for('static', filename='images/villager.png') }}" alt="Villageois" class="role-image">
+                    Villageois
                 {% endif %}
+
             </span>
         </p>
+        <div id="players-list">
+            <h2>Liste des joueurs</h2>
+            <ul>
+                {% for p in players %}
+                <li class="player-item {% if p.eliminated %}eliminated{% endif %}">
+                    {{ p.username }}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
         <div id="voting" style="display: none;">
             <h2>Votez pour éliminer un joueur</h2>
             <div id="voting-options">
@@ -102,6 +119,8 @@
             </div>
         </div>
         {% endif %}
+
+        </div>
         {% if player.role == 'Cupidon' %}
         <div id="cupid-action">
             <h3>Action de Cupidon</h3>
@@ -130,7 +149,7 @@
             {% endif %}
         </div>
         {% endif %}
-
+        <button onclick="playAudioTest()">Tester l'audio</button>
         
         {% if player.role == 'Sorcière' and game.current_phase == 'night' %}
         <div id="sorceress-action">
@@ -179,8 +198,8 @@
             </div>
         {% endif %}
 
-
-
+        
+        
         <!-- Section de vote -->
         {% if game.current_phase == 'voting' and not player.eliminated %}
         <div id="voting">
@@ -241,6 +260,20 @@
             timerDisplay.textContent = `Temps restant : ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
             console.log("Timer mis à jour :", remainingTime, "secondes restantes.");
         }
+        document.addEventListener('DOMContentLoaded', () => {
+            const messagesDiv = document.getElementById('messages');
+            const chatDisabledMessage = document.querySelector('#chat p');
+
+            if ("{{ game.current_phase }}" === "night" && "{{ player.role }}" !== "Loup-Garou") {
+                if (messagesDiv) messagesDiv.style.display = 'none';
+                if (chatDisabledMessage) chatDisabledMessage.style.display = 'block';
+            } else {
+                if (messagesDiv) messagesDiv.style.display = 'block';
+                if (chatDisabledMessage) chatDisabledMessage.style.display = 'none';
+            }
+        });
+
+
 
 
 
@@ -261,71 +294,59 @@
         // Casting a vote
         function castVote(votedUserId) {
         socket.emit('vote', { room: room, votedUserId: votedUserId });
-    }
+        }
         // Listen for vote results
         socket.on('vote_result', (data) => {
             alert(`${data.eliminatedPlayer} a été éliminé !`);
             location.reload(); // Reload the page to reflect updates
         });
 
+        socket.on('lover_died', (data) => {
+            alert(`${data.lover} est mort(e) d'amour suite à l'élimination de son/sa partenaire.`);
+        });
 
 
         socket.on('phase_change', (data) => {
+            if (data.game_id !== "{{ game.id }}") return; // Assurez-vous que l'événement concerne la partie actuelle
+
+            console.log("Phase changée : ", data.new_phase);
+
+            const body = document.getElementById('game-body');
+            const transitionElement = document.getElementById('phase-transition');
+            const votingDiv = document.getElementById('voting');
+            const chatDiv = document.getElementById('chat');
+
+            // Mettre à jour la classe du body pour changer le style selon la phase
+            body.className = data.new_phase;
+
+            // Mise à jour des sections visibles selon la phase
             if (data.new_phase === 'voting') {
-                document.getElementById('voting').style.display = 'block';
-                document.getElementById('chat').style.display = 'none';
-            } else {
-                document.getElementById('voting').style.display = 'none';
-                document.getElementById('chat').style.display = 'block';
+                votingDiv.style.display = 'block';
+                chatDiv.style.display = 'none';
+            } else if (data.new_phase === 'day') {
+                votingDiv.style.display = 'none';
+                chatDiv.style.display = 'block';
+            } else if (data.new_phase === 'night') {
+                votingDiv.style.display = 'none';
+                chatDiv.style.display = ( "{{ player.role }}" === "Loup-Garou" ? 'block' : 'none' );
             }
-            if (data.game_id == "{{ game.id }}") {
-                const body = document.getElementById('game-body');
-                const transitionElement = document.getElementById('phase-transition');
-                const votingDiv = document.getElementById('voting');
-                const chatDiv = document.getElementById('chat');
 
-                // Mettre à jour la classe du body pour changer le fond
-                console.log("Changing phase to:", data.new_phase); // Debugging
-                body.className = data.new_phase;
+            // Animation de transition de phase
+            const phaseText = {
+                night: '🌙 La nuit tombe...',
+                voting: '🗳️ Phase de vote...',
+                day: '☀️ La journée commence...'
+            };
+            transitionElement.textContent = phaseText[data.new_phase] || 'Phase inconnue';
+            transitionElement.style.display = 'block';
+            transitionElement.classList.add('fade-in');
 
-                // Afficher ou cacher les sections selon la phase
-                if (data.new_phase === 'voting') {
-                    votingDiv.style.display = 'block';
-                    chatDiv.style.display = 'none';
-                } else if (data.new_phase === 'day') {
-                    votingDiv.style.display = 'none';
-                    chatDiv.style.display = 'block';
-                } else if (data.new_phase === 'night') {
-                    votingDiv.style.display = 'none';
-                    chatDiv.style.display = 'none';
-                }
-
-                // Afficher une animation de transition
-                transitionElement.style.display = 'block';
-                transitionElement.textContent =
-                    data.new_phase === 'night' ? '🌙 La nuit tombe...' :
-                    data.new_phase === 'voting' ? '🗳️ Phase de vote...' :
-                    '☀️ La journée commence...';
-                transitionElement.classList.add('fade-in');
-
-                setTimeout(() => {
-                    transitionElement.classList.remove('fade-in');
-                    transitionElement.style.display = 'none';
-                }, 3000);
-            }
-            if (data.game_id == "{{ game.id }}") {
-                if (data.game_id == "{{ game.id }}") {
-                console.log("Changement de phase détecté :", data.new_phase);
-
-                // Réinitialiser l'affichage de la phase
-                const body = document.getElementById('game-body');
-                body.className = data.new_phase;
-
-                // Réinitialiser le timer
-                clearInterval(timerInterval);
-                initializeTimer();
-            }  // Redémarrer le timer avec les nouvelles données
-                    }
+            // Recharge automatique après l'animation
+            setTimeout(() => {
+                transitionElement.style.display = 'none';
+                transitionElement.classList.remove('fade-in');
+                location.reload(); // Recharge la page pour afficher les nouvelles données
+            }, 3000); // Durée de l'animation en millisecondes
         });
         socket.on('cupid_announcement', (data) => {
             if (data.game_id == "{{ game.id }}") {
@@ -338,6 +359,43 @@
                     notification.style.display = 'none';
                 }, 5000);
             }
+        });
+        socket.on('fool_win', (data) => {
+            alert(data.message); // Afficher un message indiquant que le Fou a gagné
+
+            // Créer un lecteur audio pour jouer le son crazy.mp3
+            const crazyAudio = new Audio(data.crazy_sound);
+            crazyAudio.play();
+
+            // Rediriger les joueurs vers la page d'accueil après 5 secondes
+            setTimeout(() => {
+                window.location.href = "/";
+            }, 5000);
+        });
+        socket.on('wolves_win', (data) => {
+            alert(data.message); // Afficher un message indiquant que les Loups-Garous ont gagné
+
+            // Créer un lecteur audio pour jouer le son werewolf.mp3
+            const werewolfAudio = new Audio(data.sound);
+            werewolfAudio.play();
+
+            // Rediriger les joueurs vers la page d'accueil après 5 secondes
+            setTimeout(() => {
+                window.location.href = "/";
+            }, 5000);
+        });
+
+        socket.on('villagers_win', (data) => {
+            alert(data.message); // Afficher un message indiquant que les Villageois ont gagné
+
+            // Créer un lecteur audio pour jouer le son win.mp3
+            const winAudio = new Audio(data.sound);
+            winAudio.play();
+
+            // Rediriger les joueurs vers la page d'accueil après 5 secondes
+            setTimeout(() => {
+                window.location.href = "/home";
+            }, 5000);
         });
 
 
@@ -373,7 +431,30 @@
         const sendButton = document.getElementById('send');
         const messageBox = document.getElementById('message-box');
         const messagesDiv = document.getElementById('messages');
+        const audio = document.getElementById("phase-audio");
+        const audioSource = document.getElementById("audio-source");
 
+        function updateAudio(phase) {
+            const audioSource = document.getElementById("audio-source");
+            const audio = document.getElementById("phase-audio");
+            if (!audio || !audioSource) return;
+
+            const audioFiles = {
+                night: "{{ url_for('static', filename='audio/night.mp3') }}",
+                day: "{{ url_for('static', filename='audio/day.mp3') }}",
+                voting: "{{ url_for('static', filename='audio/vote.mp3') }}"
+            };
+
+            if (audioFiles[phase]) {
+                audioSource.src = audioFiles[phase];
+                audio.load();
+                audio.play();
+            }
+        }
+
+
+    // Initialiser le son en fonction de la phase actuelle
+        updateAudio("{{ game.current_phase }}");
         sendButton.addEventListener('click', () => {
             const message = messageBox.value.trim();
             if (message) {
@@ -419,13 +500,26 @@
             });
         }
 
+
         socket.on('game_over', (data) => {
             alert(data.message);
             window.location.href = "/home"; // Redirection vers l'accueil après la fin du jeu
         });
 
 
-
+        if (sendButton && messageBox) {
+            sendButton.addEventListener('click', () => {
+                const message = messageBox.value.trim();
+                if (message) {
+                    socket.emit('message', {
+                        username: "{{ session['username'] }}",
+                        message: message,
+                        room: "game_{{ game.id }}"
+                    });
+                    messageBox.value = '';
+                }
+            });
+        }
         // Réception des messages
         socket.on('message', (data) => {
             const msg = document.createElement('div');
@@ -440,6 +534,7 @@
             messagesDiv.appendChild(msg);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         });
+
 
     </script>
 
@@ -482,6 +577,23 @@
 
         .fade-in {
             animation: fadeInOut 3s;
+        }
+        #players-list {
+            margin-top: 20px;
+        }
+
+        .player-item {
+            font-size: 1.2rem;
+            list-style: none;
+            margin: 5px 0;
+        }
+
+        .player-item.eliminated {
+            text-decoration: line-through;
+            color: red;
+        }
+        #phase-audio {
+            display: none;
         }
     </style>
 </body>

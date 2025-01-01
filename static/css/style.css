@@ -402,6 +402,9 @@ form button:hover {
     background: rgba(80, 80, 80, 0.95); /* Différenciation pour les messages de l'utilisateur */
     border: 1px solid #555;
 }
+#werewolf-vote {
+    display: block; /* Assurez-vous que le conteneur est visible */
+}
 
 .vote-button {
     padding: 10px 20px;
@@ -477,4 +480,8 @@ body.night {
 
 #end-phase .button:hover {
     background-color: #c0392b;
+}
+
+#background-audio {
+    display: none; /* Masquer le lecteur audio pour l'utilisateur */
 }

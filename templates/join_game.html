@@ -43,5 +43,9 @@
             <a href="{{ url_for('home') }}" style="color: #007bff; text-decoration: none;">Retour à l'accueil</a>
         </p>
     </div>
+    <audio id="background-audio" autoplay loop>
+        <source src="{{ url_for('static', filename='audio/main.mp3') }}" type="audio/mpeg">
+        Votre navigateur ne supporte pas l'élément audio.
+    </audio>
 </body>
 </html>
