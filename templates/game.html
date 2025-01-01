@@ -61,6 +61,10 @@
         <div id="phase-transition" class="phase-transition"></div>
 
         <!-- Minuteur -->
+        {% if player.eliminated %}
+        <a href="{{ url_for('eliminated_page', game_id=game.id) }}" class="button">Aller à la salle des éliminés</a>
+        {% endif %}
+        
         <p id="timer">Temps restant : 5:00</p>
         {% if not player.eliminated %}
         <div id="chat" class="chat-container">
@@ -165,24 +169,10 @@
             </form>
         </div>
         {% endif %}
-        {% if session['user_id'] == game.created_by %}
-        <div id="host-actions" class="host-actions">
-            <form method="POST" action="{{ url_for('next_phase', game_id=game.id) }}">
-                <button type="submit" class="button">Passer à la phase suivante</button>
-            </form>
-        </div>
-        {% endif %}
-        {% if session['user_id'] == game.created_by %}
-        <div id="end-phase" class="host-actions">
-            <form method="POST" action="{{ url_for('next_phase', game_id=game.id) }}">
-                <button type="submit" class="button">Terminer la phase</button>
-            </form>
-        </div>
-        {% endif %}
 
 
         <!-- Section de vote -->
-        {% if not player.eliminated %}
+        {% if game.current_phase == 'voting' and not player.eliminated %}
         <div id="voting">
             <h2>Votez pour éliminer un joueur</h2>
             <div id="voting-options">
@@ -195,7 +185,7 @@
                 {% endfor %}
             </div>
         </div>
-        {% else %}
+        {% elif player.eliminated %}
         <p>Vous êtes éliminé et ne pouvez plus voter.</p>
         {% endif %}
         
@@ -387,19 +377,20 @@
         });
         function castWerewolfVote(victimId) {
             if (!victimId) {
-                alert("Erreur : Aucun joueur sélectionné.");
+                console.error("Erreur : Aucun joueur sélectionné.");
                 return;
             }
 
+            console.log(`DEBUG: victimId=${victimId}`);
             socket.emit('werewolf_vote', {
                 room: `game_{{ game.id }}`,
                 victimId: victimId
             });
         }
 
-        socket.on('player_eliminated', (data) => {
-            alert(`${data.eliminatedPlayer} a été éliminé. Raison : ${data.reason}`);
-            location.reload(); // Rechargez la page pour refléter l'état mis à jour
+        socket.on('game_over', (data) => {
+            alert(data.message);
+            window.location.href = "/home"; // Redirection vers l'accueil après la fin du jeu
         });
 
 

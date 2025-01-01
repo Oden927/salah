@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Joueurs éliminés</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="content">
+        <h1>Joueurs éliminés - Partie {{ game.name }}</h1>
+        <ul>
+            {% for player in eliminated_players %}
+                <li>{{ player.user.username }}</li>
+            {% endfor %}
+        </ul>
+
+        <div id="chat" class="chat-container">
+            <h2>Chat des éliminés</h2>
+            <div id="messages" class="messages-container">
+                <!-- Messages s'afficheront ici -->
+            </div>
+            <input type="text" id="message-box" placeholder="Tapez votre message...">
+            <button id="send">Envoyer</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        const username = "{{ session['username'] }}";
+        const room = "eliminated_{{ game.id }}";
+
+        // Rejoindre le chat des éliminés
+        socket.emit('join', { username: username, room: room });
+
+        // Envoi de messages
+        const sendButton = document.getElementById('send');
+        const messageBox = document.getElementById('message-box');
+        sendButton.addEventListener('click', () => {
+            const message = messageBox.value.trim();
+            if (message) {
+                socket.emit('message', { username: username, message: message, room: room });
+                messageBox.value = ''; // Vider la zone de texte
+            }
+        });
+
+        // Réception des messages
+        const messagesDiv = document.getElementById('messages');
+        socket.on('message', (data) => {
+            const msg = document.createElement('div');
+            msg.classList.add('message-block');
+            msg.innerHTML = `<strong>${data.username}</strong>: ${data.message}`;
+            messagesDiv.appendChild(msg);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Défilement automatique
+        });
+    </script>
+</body>
+</html>
