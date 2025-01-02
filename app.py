@@ -592,7 +592,7 @@ def handle_vote(data):
     votes[room][voted_user_id] = votes[room].get(voted_user_id, 0) + 1
 
     # Vérifiez si tous les joueurs actifs ont voté
-    active_players = [player for player in game.players if not player.eliminated]
+    active_players = Player.query.filter_by(game_id=game.id, eliminated=False).all()
     if len(votes[room]) == len(active_players):
         # Trouvez le joueur avec le plus de votes
         max_votes = max(votes[room].values())
@@ -712,15 +712,9 @@ def end_phase(game_id):
     """Passe automatiquement à la phase suivante à la fin du timer."""
     with app.app_context():
         game = Game.query.get(game_id)
-        if not game:
-            print(f"Game with ID {game_id} not found.")
-            return
-
-        print(f"Fin de la phase pour la partie {game_id}. Phase actuelle : {game.current_phase}")
-
-        # Forcez la transition à la phase suivante
-        transition_phase(game)
-
+        if game:
+            print(f"Fin de la phase pour la partie {game_id}. Phase actuelle : {game.current_phase}")
+            transition_phase(game)
 
 
 @app.route('/start_game/<int:game_id>', methods=['POST'])
@@ -883,25 +877,26 @@ def transition_phase(game):
         elif game.current_phase == 'day':
             for player in game.players:
                 player.action_used = False
-            db.session.commit()
+                db.session.commit()
             game.current_phase = 'voting'
             notification = "🗳️ Phase de vote. Les joueurs doivent voter pour éliminer un suspect."
         elif game.current_phase == 'voting':
             game.current_phase = 'night'
             notification = "🌙 La nuit tombe. Les Loups-Garous se réveillent."
 
+        # Mettre à jour la phase et le temps de départ
         game.phase_start_time = datetime.utcnow()
         db.session.commit()
 
-        # Planifiez la prochaine phase
+        # Planifiez la fin de la nouvelle phase
         schedule_phase_end(game)
 
+        # Notifiez les joueurs
         socketio.emit('phase_change', {
             'game_id': game.id,
             'new_phase': game.current_phase,
             'notification': notification
         }, room=f"game_{game.id}")
-
 
 
 
@@ -970,11 +965,7 @@ def handle_werewolf_vote(data):
         print(f"DEBUG: Phase actuelle: {game.current_phase}. Les votes sont uniquement autorisés pendant la nuit.")
         emit('error', {'message': "Les votes des Loups-Garous ne sont autorisés que pendant la phase de nuit."})
         return
-    # Ajoutez le vote et passez automatiquement à la phase suivante si tous les votes sont terminés
-    werewolves = Player.query.filter_by(game_id=game.id, role='Loup-Garou', eliminated=False).all()
-    if len(votes[room]) >= len(werewolves):
-        transition_phase(game)  # Passez immédiatement à la phase suivante
-   
+
     # Initialisation des votes
     if room not in votes:
         votes[room] = {}
