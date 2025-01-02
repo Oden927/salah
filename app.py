@@ -271,6 +271,7 @@ def create_game():
     return render_template('create_game.html')
 
 
+from sqlalchemy.sql import func
 
   
 
@@ -280,13 +281,15 @@ def join_game():
         flash("Veuillez vous connecter pour rejoindre une partie.", "danger")
         return redirect(url_for('login'))
 
-    # Récupérer toutes les parties non commencées
-    games = Game.query.filter_by(started=False).all()
+    # Get all available games
+    games = Game.query.filter(
+        Game.started == False,
+        Game.max_players > db.session.query(func.count(Player.id)).filter(Player.game_id == Game.id)
+    ).all()
 
     if request.method == 'POST':
         game_id = request.form.get('game_id')
 
-        # Vérifiez que game_id est valide
         if not game_id or not game_id.isdigit():
             flash("Aucune partie valide sélectionnée.", "danger")
             return redirect(url_for('join_game'))
@@ -296,28 +299,46 @@ def join_game():
             flash("Cette partie n'existe pas.", "danger")
             return redirect(url_for('join_game'))
 
-        # Vérifiez si l'utilisateur est déjà inscrit dans une partie
-        existing_player = Player.query.filter_by(user_id=session['user_id']).first()
-        if existing_player:
-            if existing_player.game_id == game_id:
-                flash("Vous êtes déjà inscrit dans cette partie.", "info")
-                return redirect(url_for('waiting_room', game_id=game_id))
-            else:
-                flash("Vous êtes déjà inscrit dans une autre partie.", "danger")
-                return redirect(url_for('home'))
-
-        # Vérifiez si la partie est complète
-        if len(game.players) >= game.max_players:
-            flash("Cette partie est déjà complète.", "info")
+        # Check if game has started
+        if game.started:
+            flash("Cette partie a déjà commencé.", "danger")
             return redirect(url_for('join_game'))
 
-        # Ajouter le joueur à la partie avec un rôle par défaut
-        new_player = Player(user_id=session['user_id'], game_id=game_id, role='En attente')
-        db.session.add(new_player)
-        db.session.commit()
+        # Check if game is full
+        current_players = Player.query.filter_by(game_id=game_id).count()
+        if current_players >= game.max_players:
+            flash("Cette partie est complète.", "danger")
+            return redirect(url_for('join_game'))
 
-        flash(f"Vous avez rejoint la partie '{game.name}'.", "success")
-        return redirect(url_for('waiting_room', game_id=game_id))
+        # Check if player is already in the game
+        existing_player = Player.query.filter_by(user_id=session['user_id'], game_id=game_id).first()
+        if existing_player:
+            flash("Vous êtes déjà dans cette partie.", "info")
+            return redirect(url_for('waiting_room', game_id=game_id))
+
+        # Add player to game
+        new_player = Player(
+            user_id=session['user_id'],
+            game_id=game_id,
+            role='En attente'
+        )
+        db.session.add(new_player)
+        
+        try:
+            db.session.commit()
+            flash(f"Vous avez rejoint la partie '{game.name}'.", "success")
+            
+            # Notify other players via WebSocket
+            socketio.emit('player_joined', {
+                'username': session.get('username'),
+                'game_id': game_id
+            }, room=f'game_{game_id}')
+            
+            return redirect(url_for('waiting_room', game_id=game_id))
+        except:
+            db.session.rollback()
+            flash("Une erreur est survenue lors de l'inscription.", "danger")
+            return redirect(url_for('join_game'))
 
     return render_template('join_game.html', games=games)
 
@@ -347,9 +368,7 @@ def clean_database():
     return redirect(url_for('home'))
 
 def get_host(self):
-    first_player = Player.query.filter_by(game_id=self.id).order_by(Player.id).first()
-    return first_player  # Cela retourne bien l'objet `Player`
-
+    return Player.query.filter_by(game_id=self.id, user_id=self.created_by).first()
 def assign_new_host(self):
     # Trouver le premier joueur encore dans la partie
     new_host = Player.query.filter_by(game_id=self.id).order_by(Player.id).first()
@@ -382,13 +401,9 @@ def waiting_room(game_id):
         flash("Cette partie n'existe pas.", "danger")
         return redirect(url_for('home'))
 
-    # Récupérez l'hôte actuel
-    host = game.get_host()
-
-    # Définissez si l'utilisateur actuel est l'hôte
-    is_host = session.get('user_id') == (host.user_id if host else None)
-
     players = game.players
+    host = game.get_host()
+    is_host = session.get('user_id') == (host.user_id if host else None)
 
     return render_template('waiting_room.html', game=game, players=players, is_host=is_host)
 

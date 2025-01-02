@@ -24,21 +24,27 @@
             {% if games %}
                 {% for game in games %}
                     <li>
-                        <strong>{{ game.name }}</strong> - {{ game.max_players }} joueurs max
-                        <p>{{ game.players|length if game.players else 0 }} joueur(s) ont rejoint cette partie</p>
-                        <form method="POST" style="display:inline;">
-                            <input type="hidden" name="game_id" value="{{ game.id }}">
-                            <button type="submit" {% if game.players|length >= game.max_players %}disabled{% endif %}>
-                                Rejoindre
-                            </button>
-                        </form>
-                        <a href="{{ url_for('waiting_room', game_id=game.id) }}" class="button">Salle d'attente</a>
+                        <strong>{{ game.name }}</strong>
+                        <p>Joueurs: {{ game.players|length }}/{{ game.max_players }}</p>
+                        <p>Statut: {% if game.started %}Commencée{% else %}En attente{% endif %}</p>
+                        
+                        {% if not game.started and game.players|length < game.max_players %}
+                            <form method="POST" style="display:inline;">
+                                <input type="hidden" name="game_id" value="{{ game.id }}">
+                                <button type="submit">Rejoindre</button>
+                            </form>
+                        {% endif %}
+                        
+                        {% if game.players|length >= game.max_players %}
+                            <span class="full-game">Partie complète</span>
+                        {% endif %}
                     </li>
                 {% endfor %}
             {% else %}
-                <p>Aucune partie disponible pour le moment. Créez-en une !</p>
+                <p>Aucune partie disponible.</p>
             {% endif %}
         </ul>
+        
         <p style="text-align: center; margin-top: 10px;">
             <a href="{{ url_for('home') }}" style="color: #007bff; text-decoration: none;">Retour à l'accueil</a>
         </p>

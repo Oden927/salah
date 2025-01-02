@@ -94,28 +94,29 @@ class Player(db.Model):
 import random
 
 def assign_roles(players):
-
     roles = []
 
-    # Toujours inclure un Loup-Garou et un Villageois
+    # Toujours inclure au moins un Loup-Garou et un Villageois
     roles.append('Loup-Garou')
     roles.append('Villageois')
 
-    # Calculer le reste des rôles
-    num_werewolves = max(1, (len(players) - 2) // 4)  # Exemple : 1 Loup-Garou pour 4 joueurs restants
-    num_seer = min(1, len(players) - len(roles))  # 1 Voyante si possible
-    num_sorceress = min(1, len(players) - len(roles))  # 1 Sorcière si possible
-    num_cupid = min(1, len(players) - len(roles))  # 1 Cupidon si possible
-    num_villagers = len(players) - len(roles) - num_werewolves - num_seer - num_sorceress - num_cupid
-    num_fool = min(1, len(players) - len(roles))  # Inclure le Fou
+    num_players = len(players)
+
+    # Calculer le nombre de rôles spéciaux selon le nombre de joueurs
+    num_werewolves = max(1, num_players // 4)  # 1 Loup-Garou pour 4 joueurs
+    num_seer = min(1, num_players - len(roles))  # Maximum 1 Voyante
+    num_sorceress = min(1, num_players - len(roles))  # Maximum 1 Sorcière
+    num_cupid = min(1, num_players - len(roles))  # Maximum 1 Cupidon
+    num_fool = min(1, num_players - len(roles))  # Maximum 1 Fou
+    num_villagers = num_players - len(roles) - num_werewolves - num_seer - num_sorceress - num_cupid - num_fool
 
     # Ajouter les rôles restants
     roles.extend(['Loup-Garou'] * num_werewolves)
     roles.extend(['Voyante'] * num_seer)
     roles.extend(['Sorcière'] * num_sorceress)
     roles.extend(['Cupidon'] * num_cupid)
+    roles.extend(['Fou'] * num_fool)
     roles.extend(['Villageois'] * num_villagers)
-    roles.extend(['Fou'] * num_fool)  # Ajout du rôle Fou   
 
     # Mélanger les rôles pour les distribuer aléatoirement
     random.shuffle(roles)
@@ -123,6 +124,7 @@ def assign_roles(players):
     # Assigner les rôles aux joueurs
     for player, role in zip(players, roles):
         player.role = role
+        print(f"[DEBUG] {player.user.username} a reçu le rôle : {role}")  # Log pour vérification
 
 
 
