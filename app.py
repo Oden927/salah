@@ -36,7 +36,7 @@ app.config['MAIL_PORT'] = 2525
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USERNAME'] = 'apikey'  # Nom d'utilisateur obligatoire pour SendGrid
 app.config['MAIL_PASSWORD'] = os.getenv('SENDGRID_API_KEY')
-app.config['MAIL_DEFAULT_SENDER'] = 'noreply.loupgarou@gmail.com'  # Expéditeur par défaut
+app.config['MAIL_DEFAULT_SENDER'] = 's.bektera@gmail.com'  # Expéditeur par défaut
 # Configuration de la base de données
 if 'DATABASE_URL' in os.environ:
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DATABASE_URL']
