@@ -17,6 +17,8 @@
                 <a href="/logout">Déconnexion</a>
             </div>
         </div>
+    
+</head>
 <body id="game-body" class="{{ game.current_phase }}">
     <div class="content">
         <h1>Partie {{ game.name }}</h1>
@@ -44,7 +46,6 @@
 
             </span>
         </p>
-        
         <!-- Liste des joueurs -->
         <div id="players-list">
             <h2>Liste des joueurs</h2>
@@ -67,164 +68,163 @@
         <div id="phase-transition" class="phase-transition"></div>
         
 
-        <!-- Chat -->
-        <div id="chat">
-            <h2>Discussion</h2>
-            <div id="messages" class="messages-container">
-                <!-- Messages du chat s'afficheront ici -->
-            </div>
-            <input type="text" id="message-box" placeholder="Tapez votre message..." class="message-input">
-            <button id="send-button" class="button">Envoyer</button>
-        </div>
-        <div id="voting-container" style="display: none;">
-            <h2>Phase de Vote</h2>
-            <p>Votez pour le joueur que vous souhaitez éliminer :</p>
+        <div id="voting" style="display: none;">
+            <h2>Votez pour éliminer un joueur</h2>
             <div id="voting-options">
                 {% for player in players %}
                     {% if not player.eliminated %}
-                        <button class="vote-button" onclick="castVote('{{ player.user_id }}', '{{ player.username }}')">
-                            Voter pour {{ player.username }}
+                        <button class="vote-button" onclick="castVote('{{ player.user_id }}')">
+                            {{ player.username }}
                         </button>
                     {% endif %}
                 {% endfor %}
             </div>
         </div>
         
+        <div id="chat" class="chat-container">
+            <h2>Discussion</h2>
+            {% if game.current_phase == 'night' and player.role == "Loup-Garou" %}
+                <div id="messages" class="messages-container">
+                    <!-- Les messages s'afficheront ici -->
+                </div>
+                <input type="text" id="message-box" placeholder="Tapez votre message..." class="message-input">
+                <button id="send" class="auth-button">Envoyer</button>
+            {% elif game.current_phase == 'night' %}
+                <p>Le chat est désactivé pour les non-Loups-Garous pendant la nuit.</p>
+            {% elif player.eliminated %}
+                <p>Vous êtes éliminé et ne pouvez plus participer à la discussion.</p>
+            {% else %}
+                <div id="messages" class="messages-container">
+                    <!-- Les messages s'afficheront ici -->
+                </div>
+                <input type="text" id="message-box" placeholder="Tapez votre message..." class="message-input">
+                <button id="send" class="auth-button">Envoyer</button>
+            {% endif %}
+        </div>
+        
+        {% if player.role == 'Loup-Garou' and game.current_phase == 'night' %}
+        <div id="werewolf-vote">
+            <h2>Votez pour choisir une victime</h2>
+            <div id="werewolf-voting-options">
+                {% for p in players %}
+                    {% if not p.eliminated and p.role != 'Loup-Garou' %}
+                        <button class="vote-button" onclick="castWerewolfVote('{{ p.user_id }}')">
+                            {{ p.username }}
+                        </button>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
 
-        <!-- Vote des Loups-Garous (visible uniquement pour eux pendant la nuit) -->
-        {% if player.role == "Loup-Garou" and game.current_phase == "night" %}
-            <div id="werewolf-vote">
-                <h2>Votez pour choisir une victime</h2>
-                <div id="werewolf-voting-options">
-                    {% for player in players %}
-                        {% if not player.eliminated and player.role != "Loup-Garou" %}
-                            <button class="vote-button" onclick="castWerewolfVote('{{ player.user_id }}', '{{ player.username }}')">
-                                {{ player.username }}
-                            </button>
+        </div>
+        {% if player.role == 'Cupidon' %}
+        <div id="cupid-action">
+            <h3>Action de Cupidon</h3>
+            {% if player.action_used %}
+                <p>Vous avez déjà utilisé votre pouvoir. Vous êtes maintenant un Villageois.</p>
+            {% else %}
+                <form method="POST" action="{{ url_for('cupid_action', game_id=game.id) }}">
+                    <label for="lover1_id">Choisissez le premier amoureux :</label>
+                    <select name="lover1_id" id="lover1_id">
+                        {% for p in players %}
+                            {% if p.user_id != session['user_id'] and not p.eliminated %}
+                                <option value="{{ p.user_id }}">{{ p.username }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    <label for="lover2_id">Choisissez le second amoureux :</label>
+                    <select name="lover2_id" id="lover2_id">
+                        {% for p in players %}
+                            {% if p.user_id != session['user_id'] and not p.eliminated %}
+                                <option value="{{ p.user_id }}">{{ p.username }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="button">Valider</button>
+                </form>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if player.role == 'Sorcière' and game.current_phase == 'night' %}
+        <div id="sorceress-action">
+            <h3>Action de la Sorcière</h3>
+            <form method="POST" action="{{ url_for('sorceress_action', game_id=game.id) }}">
+                <label for="action">Choisissez une action :</label>
+                <select name="action" id="action">
+                    {% if not player.potion_heal_used %}
+                        <option value="heal">Utiliser la potion de soin</option>
+                    {% endif %}
+                    {% if not player.potion_poison_used %}
+                        <option value="poison">Utiliser la potion de poison</option>
+                    {% endif %}
+                </select>
+                <label for="target_id">Choisissez un joueur :</label>
+                <select name="target_id" id="target_id">
+                    {% for p in players %}
+                        {% if not p.eliminated %}
+                            <option value="{{ p.user_id }}">{{ p.username }}</option>
                         {% endif %}
                     {% endfor %}
-                </div>
+                </select>
+                <button type="submit" class="button">Valider</button>
+            </form>
+        </div>
+        {% endif %}
+
+        {% if player.role == 'Voyante' and game.current_phase == 'night' %}
+            <div id="seer-action">
+                <h3>Action de la Voyante</h3>
+                {% if player.action_used %}
+                    <p>Vous avez déjà utilisé votre pouvoir cette nuit.</p>
+                {% else %}
+                    <form method="POST" action="{{ url_for('seer_action', game_id=game.id) }}">
+                        <label for="target_id">Choisissez un joueur :</label>
+                        <select name="target_id" id="target_id">
+                            {% for p in players %}
+                                {% if p.user_id != session['user_id'] and not p.eliminated %}
+                                    <option value="{{ p.user_id }}">{{ p.username }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="button">Utiliser votre pouvoir</button>
+                    </form>
+                {% endif %}
             </div>
         {% endif %}
+        <div id="notification" class="notification" style="display: none;"></div>
 
-        <!-- Action de Cupidon (visible uniquement pour Cupidon) -->
-        {% if player.role == "Cupidon" and game.current_phase == "night" and not player.action_used %}
-        <div id="cupid-action">
-            <h2>Liez deux joueurs</h2>
-            <form id="cupid-form">
-                <label for="lover1">Premier joueur :</label>
-                <select id="lover1" name="lover1">
-                    {% for player in players %}
-                        {% if player.user_id != session['user_id'] and not player.eliminated %}
-                            <option value="{{ player.user_id }}">{{ player.username }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-
-                <label for="lover2">Deuxième joueur :</label>
-                <select id="lover2" name="lover2">
-                    {% for player in players %}
-                        {% if player.user_id != session['user_id'] and not player.eliminated %}
-                            <option value="{{ player.user_id }}">{{ player.username }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-
-                <button type="button" id="submit-cupid" class="button">Valider</button>
-            </form>
+        
+        
+        <!-- Section de vote -->
+        {% if game.current_phase == 'voting' and not player.eliminated %}
+        <div id="voting">
+            <h2>Votez pour éliminer un joueur</h2>
+            <div id="voting-options">
+                {% for p in players %}
+                    {% if not p.eliminated %}
+                        <button class="vote-button" onclick="castVote('{{ p.user_id }}')">
+                            {{ p.username }}
+                        </button>
+                    {% endif %}
+                {% endfor %}
+            </div>
         </div>
+        {% elif player.eliminated %}
+        <p>Vous êtes éliminé et ne pouvez plus voter.</p>
         {% endif %}
-
-        <!-- Action de la Sorcière (visible uniquement pour la Sorcière) -->
-        {% if player.role == "Sorcière" and game.current_phase == "night" %}
-        <div id="witch-action">
-            <h2>Actions de la Sorcière</h2>
-            <form id="witch-form">
-                <label for="heal-target">Sauver un joueur :</label>
-                <select id="heal-target" name="heal-target">
-                    {% for player in players %}
-                        {% if not player.eliminated %}
-                            <option value="{{ player.user_id }}">{{ player.username }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-
-                <label for="poison-target">Tuer un joueur :</label>
-                <select id="poison-target" name="poison-target">
-                    {% for player in players %}
-                        {% if not player.eliminated %}
-                            <option value="{{ player.user_id }}">{{ player.username }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-
-                <button type="button" id="heal-button" class="button">Utiliser la potion de guérison</button>
-                <button type="button" id="poison-button" class="button">Utiliser la potion de poison</button>
-            </form>
-        </div>
-        {% endif %}
-             <!-- Action de la Voyante (visible uniquement pour la Voyante pendant la nuit) -->
-        {% if player.role == "Voyante" and game.current_phase == "night" and not player.seer_used %}
-        <div id="seer-action">
-            <h2>Voir le rôle d'un joueur</h2>
-            <form id="seer-form">
-                <label for="seer-target">Choisissez un joueur :</label>
-                <select id="seer-target" name="seer-target">
-                    {% for player in players %}
-                        {% if player.user_id != session['user_id'] and not player.eliminated %}
-                            <option value="{{ player.user_id }}">{{ player.username }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-                <button type="button" id="seer-button" class="button">Révéler le rôle</button>
-            </form>
-        </div>
-        {% endif %}
-    </div>
-    <ul>
-        {% for player in players %}
-            <li class="player-item {% if player.eliminated %}eliminated{% endif %}" data-user-id="{{ player.user_id }}">
-                {{ player.username }}
-            </li>
-        {% endfor %}
-    </ul>
-            
-    
+        
 
     <script>
-        const socket = io();
-        const room = "game_{{ game.id }}";
+       const socket = io();
         const username = "{{ session['username'] }}";
-
-        // Rejoindre la salle du jeu
+        const room = "game_{{ game.id }}";
+        // Join room
         socket.emit('join', { username: username, room: room });
 
-        // Gestion des messages du chat
-        socket.on('message', (data) => {
-            const messagesDiv = document.getElementById('messages');
-            const messageBlock = document.createElement('div');
-            messageBlock.classList.add('message-block');
-            messageBlock.innerHTML = `
-                <strong>${data.username}</strong> <span>(${data.timestamp})</span>:
-                <p>${data.message}</p>
-            `;
-            messagesDiv.appendChild(messageBlock);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll automatique
-        });
-
-        // Envoi de messages
-        const sendButton = document.getElementById('send-button');
-        const messageBox = document.getElementById('message-box');
-        sendButton.addEventListener('click', () => {
-            const message = messageBox.value.trim();
-            if (message) {
-                socket.emit('message', { room: room, message: message });
-                messageBox.value = ''; // Réinitialiser la boîte de message
-            }
-        });
-
-        // Timer et phases
-        let timer = 0;
+     // Timer et phases
+     let timer = 0;
         let timerInterval;
 
         // Met à jour l'affichage du timer
@@ -248,7 +248,6 @@
                     updateTimerDisplay(timer);
                 } else {
                     clearInterval(timerInterval);
-                    alert("La phase est terminée !");
                 }
             }, 1000);
         }
@@ -264,6 +263,33 @@
                 }, 3000);
             }
         }
+        function showNotification(phase) {
+            const phaseMessages = {
+                night: "🌙 Phase de Nuit",
+                day: "☀️ Phase de Jour",
+                voting: "🗳️ Phase de Vote"
+            };
+
+            const validPhase = phaseMessages[phase] ? phase : null;
+            if (!validPhase) {
+                console.error(`Phase invalide : ${phase}`);
+                return;
+            }
+
+            const notification = document.getElementById('notification');
+            if (notification) {
+                notification.textContent = phaseMessages[phase];
+                notification.style.display = 'block';
+
+                notification.classList.add('fade-in');
+                setTimeout(() => {
+                    notification.classList.remove('fade-in');
+                    notification.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+
 
         // Met à jour la phase et démarre le timer
         function updatePhaseAndTimer(phase, remainingTime) {
@@ -297,312 +323,255 @@
             updateChatVisibility(data.current_phase, "{{ player.role }}");
         });
 
-        // Gérer les changements de phase
         socket.on('phase_change', (data) => {
             console.log("Changement de phase :", data.new_phase);
-            console.log("Joueurs actifs :", data.active_players);
-
-            updateChatVisibility(data.new_phase, "{{ player.role }}");
             updatePhaseAndTimer(data.new_phase, data.remaining_time || 60);
-            showPhaseTransition(data.notification || "Nouvelle phase...");
-
+            showNotification(`Nouvelle phase : ${data.new_phase}`);
+            // Mettre à jour la liste des joueurs ou autres sections si nécessaire
             const votingContainer = document.getElementById('voting-container');
-            const votingOptions = document.getElementById('voting-options');
-
-            if (data.new_phase === 'voting') {
-                votingOptions.innerHTML = ''; // Réinitialise les options précédentes
-                console.log("DEBUG: Joueurs actifs pour le vote :", data.active_players);
-
-                if (data.active_players && Array.isArray(data.active_players)) {
-                    data.active_players.forEach(player => {
-                        const button = document.createElement('button');
-                        button.textContent = `Voter pour ${player.username}`;
-                        button.className = 'vote-button';
-                        button.onclick = () => castVote(player.user_id, player.username);
-                        votingOptions.appendChild(button);
-                    });
-                } else {
-                    console.error("Erreur : Aucun joueur actif reçu.");
-                    alert("Erreur : Impossible d'afficher les options de vote.");
-                }
-
-                votingContainer.style.display = 'block';
-            } else {
-                votingContainer.style.display = 'none';
-            }
-        });
-
-       
-
-
-        socket.on('player_eliminated', (data) => {
-            alert(data.message || "Vous avez été éliminé !");
-            window.location.href = "{{ url_for('eliminated_page', game_id=game.id) }}";
-        });
-        socket.on('redirect_to_elimination', (data) => {
-            alert(data.message);
-            window.location.href = "{{ url_for('eliminated_page', game_id=game.id) }}";
+            votingContainer.style.display = data.new_phase === 'voting' ? 'block' : 'none';
         });
 
 
 
-        // Casting a vote (Loups-Garous seulement)
-        let hasVotedl = false;
-        let hasVoted = false;
 
 
-        function castVote(victimId, victimName) {
-            if (hasVoted) {
-                alert("Vous avez déjà voté !");
-                return;
-            }
+  
+        // Écouter les actions des Loups-Garous
+        socket.on('werewolf_action', (data) => {
+            const notification = document.createElement('div');
+            notification.classList.add('notification');
+            notification.innerHTML = `
+                <strong>Système :</strong> Les Loups-Garous ont choisi une victime (${data.victim}) à ${data.timestamp}.
+            `;
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.appendChild(notification);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll automatique
+        });
 
-            socket.emit('vote', {room: room,victimId: victimId, gameId: "{{ game.id }}"  });
-            hasVoted= true;
-            alert(`Vous avez voté pour ${victimName}.`);
+        // Casting a vote
+        function castVote(votedUserId) {
+        socket.emit('vote', { room: room, votedUserId: votedUserId });
         }
-        socket.on('vote_registered', (data) => {
-            // Show voting progress
-            const notification = document.getElementById('notification');
-            if (notification) {
-                notification.textContent = data.message;
-                notification.style.display = 'block';
-                setTimeout(() => {
-                    notification.style.display = 'none';
-                }, 3000);
-            }
-        });
-
-
-        // Notification pour un vote
-        socket.on('vote_notification', (data) => {
-            alert(`${data.voter} a voté.`);
-        });
-
-        // Annonce du résultat du vote
+        // Listen for vote results
         socket.on('vote_result', (data) => {
-            if (data.eliminatedPlayer) {
-                alert(`${data.eliminatedPlayer} a été éliminé.`);
-            } else {
-                alert("Aucun joueur n'a été éliminé, égalité des votes.");
-            }
-        });
-        function castWerewolfVote(victimId, victimName) {
-            if (hasVotedl) {
-                alert("Vous avez déjà voté !");
-                return;
-            }
-
-            console.log(`DEBUG: Envoi du vote pour la victime ID = ${victimId}`);
-            socket.emit('werewolf_vote', {
-                room: room,
-                victimId: victimId
-            });
-            hasVotedl= true;
-
-            // Afficher une notification au joueur
-            alert(`Vous avez voté pour éliminer ${victimName}.`);
-        }
-
-        // Notifications pour les votes des Loups-Garous
-        socket.on('werewolf_vote_result', (data) => {
-            alert(`Résultat du vote : ${data.victim} a été choisi comme victime.`);
-        });
-
-        // Mise à jour de la liste des joueurs
-        socket.on('player_eliminated', (data) => {
-            const playerElement = document.getElementById(`player-${data.user_id}`);
-            const playersList = document.getElementById('players-list');
+            alert(`${data.eliminatedPlayer} a été éliminé !`);
+            const playerElement = document.querySelector(`[data-player-id="${data.eliminatedPlayerId}"]`);
             if (playerElement) {
                 playerElement.classList.add('eliminated');
                 playerElement.style.textDecoration = 'line-through';
                 playerElement.style.color = 'red';
-            }
-            const playerItems = playersList.querySelectorAll('.player-item');
-            playerItems.forEach(item => {
-                if (item.textContent.trim() === data.username) {
-                    item.classList.add('eliminated'); // Ajoute la classe 'eliminated' pour barrer
-                    item.style.textDecoration = 'line-through'; // Style optionnel pour barrer immédiatement
-                    item.style.color = 'red'; // Change la couleur pour indiquer l'élimination
-                }
-            });
-            });
-        function updateChatVisibility(phase, role) {
-            const chatDiv = document.getElementById('chat');
-            const messagesDiv = document.getElementById('messages');
-            const messageBox = document.getElementById('message-box');
-            const sendButton = document.getElementById('send-button');
+            }       
+        });
 
-            if (phase === 'night' && role !== 'Loup-Garou') {
-                // Cache le chat pour les non-Loups-Garous
-                if (chatDiv) chatDiv.style.display = 'none';
-                if (messagesDiv) messagesDiv.style.display = 'none';
-                if (messageBox) messageBox.disabled = true;
-                if (sendButton) sendButton.disabled = true;
-            } else {
-                // Affiche le chat pour les autres phases ou pour les Loups-Garous
-                if (chatDiv) chatDiv.style.display = 'block';
-                if (messagesDiv) messagesDiv.style.display = 'block';
-                if (messageBox) messageBox.disabled = false;
-                if (sendButton) sendButton.disabled = false;
-            }
-        }
+        socket.on('lover_died', (data) => {
+            alert(`${data.lover} est mort(e) d'amour suite à l'élimination de son/sa partenaire.`);
+        });
 
 
-
-
-        function updateTimer() {
-            if (timer > 0) {
-                timer--;
-                document.getElementById('timer').textContent = timer;
-            } else {
-                clearInterval(timerInterval);
-                alert("La phase est terminée !");
-            }
-        }
-                        // Action de Cupidon
-        const cupidForm = document.getElementById('cupid-form');
-        const submitCupid = document.getElementById('submit-cupid');
-        if (submitCupid) {
-            submitCupid.addEventListener('click', () => {
-                const lover1 = document.getElementById('lover1').value;
-                const lover2 = document.getElementById('lover2').value;
-
-                if (lover1 === lover2) {
-                    alert("Vous ne pouvez pas lier un joueur avec lui-même.");
-                    return;
-                }
-
-                socket.emit('cupid_action', {
-                    room: room,
-                    lover1: lover1,
-                    lover2: lover2
-                });
-
-                alert("Action effectuée. Vous êtes maintenant un Villageois.");
-                document.getElementById('cupid-action').style.display = 'none';
-            });
-        }
-        // Notification publique des amoureux
         socket.on('cupid_announcement', (data) => {
+            if (data.game_id == "{{ game.id }}") {
+                const notification = document.getElementById('notification');
+                notification.textContent = data.message;
+                notification.style.display = 'block';
+
+                // Cache la notification après 5 secondes
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 5000);
+            }
+        });
+        socket.on('fool_win', (data) => {
+            alert(data.message); // Afficher un message indiquant que le Fou a gagné
+
+            // Créer un lecteur audio pour jouer le son crazy.mp3
+            const crazyAudio = new Audio(data.crazy_sound);
+            crazyAudio.play();
+
+            // Rediriger les joueurs vers la page d'accueil après 5 secondes
+            setTimeout(() => {
+                window.location.href = "/";
+            }, 5000);
+        });
+        socket.on('wolves_win', (data) => {
+            alert(data.message); // Afficher un message indiquant que les Loups-Garous ont gagné
+
+            // Créer un lecteur audio pour jouer le son werewolf.mp3
+            const werewolfAudio = new Audio(data.sound);
+            werewolfAudio.play();
+
+            // Rediriger les joueurs vers la page d'accueil après 5 secondes
+            setTimeout(() => {
+                window.location.href = "/";
+            }, 5000);
+        });
+
+        socket.on('villagers_win', (data) => {
+            alert(data.message); // Afficher un message indiquant que les Villageois ont gagné
+
+            // Créer un lecteur audio pour jouer le son win.mp3
+            const winAudio = new Audio(data.sound);
+            winAudio.play();
+
+            // Rediriger les joueurs vers la page d'accueil après 5 secondes
+            setTimeout(() => {
+                window.location.href = "/home";
+            }, 5000);
+        });
+
+
+       // Écouter l'annonce de la voyante
+        socket.on('seer_announcement', (data) => {
+            if (data.game_id == "{{ game.id }}") {
+                const notification = document.getElementById('notification');
+                notification.textContent = data.message;
+                notification.style.display = 'block';
+
+                // Cache le message après 5 secondes
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 5000);
+            }
+        });
+
+
+
+
+        // Notifications spécifiques aux rôles
+        if ("{{ player.role }}" === "Voyante") {
+            alert("C'est la nuit. Utilisez votre pouvoir pour inspecter un joueur.");
+        }
+
+        if ("{{ player.role }}" === "Cupidon") {
+            alert("Vous êtes Cupidon. Choisissez deux joueurs pour les rendre amoureux.");
+        }
+
+        if ("{{ player.role }}" === "Sorcière") {
+            alert("C'est la nuit. Vous pouvez utiliser vos potions pour soigner ou empoisonner un joueur.");
+        }
+        const sendButton = document.getElementById('send');
+        const messageBox = document.getElementById('message-box');
+        const messagesDiv = document.getElementById('messages');
+        const audio = document.getElementById("phase-audio");
+        const audioSource = document.getElementById("audio-source");
+
+        function updateAudio(phase) {
+            const audioSource = document.getElementById("audio-source");
+            const audio = document.getElementById("phase-audio");
+            if (!audio || !audioSource) return;
+
+            const audioFiles = {
+                night: "{{ url_for('static', filename='audio/night.mp3') }}",
+                day: "{{ url_for('static', filename='audio/day.mp3') }}",
+                voting: "{{ url_for('static', filename='audio/vote.mp3') }}"
+            };
+
+            if (audioFiles[phase]) {
+                audioSource.src = audioFiles[phase];
+                audio.load();
+                audio.play();
+            }
+        }
+
+
+    // Initialiser le son en fonction de la phase actuelle
+        updateAudio("{{ game.current_phase }}");
+        sendButton.addEventListener('click', () => {
+            const message = messageBox.value.trim();
+            if (message) {
+                socket.emit('message', {
+                    username: "{{ session['username'] }}",  // Utilisez le nom d'utilisateur de la session
+                    message: message,
+                    room: "game_{{ game.id }}"
+                });
+                messageBox.value = '';
+            }
+        });
+// Réception de l'événement d'élimination
+        socket.on('elimination', (data) => {
             const messagesDiv = document.getElementById('messages');
-            const announcement = document.createElement('div');
-            announcement.classList.add('message-block');
-            announcement.innerHTML = `
-                <strong>Système :</strong> ${data.lover1} et ${data.lover2} sont maintenant amoureux !
+            const eliminationMessage = document.createElement('div');
+            eliminationMessage.classList.add('elimination-message');
+            eliminationMessage.innerHTML = `
+                <strong>Système :</strong> ${data.message} (${data.timestamp}).
             `;
-            messagesDiv.appendChild(announcement);
+            messagesDiv.appendChild(eliminationMessage);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll automatique
+        });
+        socket.on('player_eliminated', (data) => {
+            const messagesDiv = document.getElementById('messages');
+            const eliminationMessage = document.createElement('div');
+            eliminationMessage.classList.add('elimination-message');
+            eliminationMessage.innerHTML = `
+                <strong>Système :</strong> ${data.eliminatedPlayer} a été éliminé. Raison : ${data.reason}.
+            `;
+            messagesDiv.appendChild(eliminationMessage);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll automatique
+        });
+        function castWerewolfVote(victimId) {
+            if (!victimId) {
+                console.error("Erreur : Aucun joueur sélectionné.");
+                return;
+            }
+
+            console.log(`DEBUG: victimId=${victimId}`);
+            socket.emit('werewolf_vote', {
+                room: `game_{{ game.id }}`,
+                victimId: victimId
+            });
+        }
+
+
+        socket.on('game_over', (data) => {
+            alert(data.message);
+            window.location.href = "/home"; // Redirection vers l'accueil après la fin du jeu
+        });
+
+
+        if (sendButton && messageBox) {
+            sendButton.addEventListener('click', () => {
+                const message = messageBox.value.trim();
+                if (message) {
+                    socket.emit('message', {
+                        username: "{{ session['username'] }}",
+                        message: message,
+                        room: "game_{{ game.id }}"
+                    });
+                    messageBox.value = '';
+                }
+            });
+        }
+        // Réception des messages
+        socket.on('message', (data) => {
+            const msg = document.createElement('div');
+            msg.classList.add('message-block');
+            msg.innerHTML = `
+                <div class="message-header">
+                    <strong>${data.username || "Utilisateur inconnu"}</strong>
+                    <span>${data.timestamp || new Date().toLocaleTimeString()}</span>
+                </div>
+                <div class="message-content">${data.message || "Message non disponible"}</div>
+            `;
+            messagesDiv.appendChild(msg);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         });
-            // Actions de la Sorcière
-        const healButton = document.getElementById('heal-button');
-        const poisonButton = document.getElementById('poison-button');
-
-        if (healButton) {
-            healButton.addEventListener('click', () => {
-                const targetId = document.getElementById('heal-target').value;
-                socket.emit('witch_action', {
-                    room: room,
-                    action: 'heal',
-                    targetId: targetId
-                });
-                alert("Potion de guérison utilisée.");
-                document.getElementById('witch-action').style.display = 'none';
-            });
-        }
-
-        if (poisonButton) {
-            poisonButton.addEventListener('click', () => {
-                const targetId = document.getElementById('poison-target').value;
-                socket.emit('witch_action', {
-                    room: room,
-                    action: 'poison',
-                    targetId: targetId
-                });
-                alert("Potion de poison utilisée.");
-                document.getElementById('witch-action').style.display = 'none';
-            });
-        }
-                // Action de la Voyante
-                const seerButton = document.getElementById('seer-button');
-        if (seerButton) {
-            seerButton.addEventListener('click', () => {
-                const targetId = document.getElementById('seer-target').value;
-
-                socket.emit('seer_action', {
-                    room: room,
-                    targetId: targetId
-                });
-
-                alert("Vous avez utilisé votre pouvoir pour voir le rôle du joueur.");
-                document.getElementById('seer-action').style.display = 'none';
-            });
-        }
-
-        // Notification privée pour la Voyante
-        socket.on('seer_notification', (data) => {
-            alert(`Notification privée : Le rôle de ${data.targetName} est ${data.role}.`);
-        });
-
-            // Notifications
-        socket.on('cupid_announcement', (data) => {
-            alert(`${data.lover1} et ${data.lover2} sont maintenant amoureux.`);
-        });
-
-        socket.on('witch_action', (data) => {
-            alert(data.message);
-        });
-    </script>
     </script>
 
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f4f4f9;
+        .role-image {
+            width: 40px;
+            height: 40px;
+            vertical-align: middle;
+            margin-right: 8px;
         }
-        .container {
-            max-width: 800px;
-            margin: auto;
+
+        .role-icon {
+            display: inline-flex;
+            align-items: center;
+            font-size: 1.2em;
+            font-weight: bold;
         }
-        #players-list ul {
-            list-style: none;
-            padding: 0;
-        }
-        .player-item {
-            font-size: 1.2rem;
-            margin: 5px 0;
-        }
-        .player-item.eliminated {
-            text-decoration: line-through;
-            color: red;
-        }
-        #chat {
-            margin-top: 20px;
-        }
-        .messages-container {
-            border: 1px solid #ccc;
-            padding: 10px;
-            height: 300px;
-            overflow-y: auto;
-            background-color: #fff;
-        }
-        .message-block {
-            margin-bottom: 10px;
-        }
-        .message-input {
-            width: 80%;
-            padding: 10px;
-            margin-right: 10px;
-        }
-        .button, .vote-button {
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
+
         .phase-transition {
             display: none;
             position: fixed;
@@ -618,82 +587,33 @@
             z-index: 1000;
         }
 
-        .fade-in {
-            animation: fadeInOut 3s ease-in-out;
-        }
-
         @keyframes fadeInOut {
             0% { opacity: 0; }
-            20% { opacity: 1; }
-            80% { opacity: 1; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
             100% { opacity: 0; }
         }
-        .role-image {
-            width: 40px;
-            height: 40px;
-            vertical-align: middle;
-            margin-right: 8px;
+
+        .fade-in {
+            animation: fadeInOut 3s;
+        }
+        #players-list {
+            margin-top: 20px;
         }
 
-        .role-icon {
-            display: inline-flex;
-            align-items: center;
-            font-size: 1.2em;
-            font-weight: bold;
+        .player-item {
+            font-size: 1.2rem;
+            list-style: none;
+            margin: 5px 0;
         }
 
-        #role-container {
-            margin-bottom: 20px;
-            text-align: center;
+        .player-item.eliminated {
+            text-decoration: line-through;
+            color: red;
         }
-
-        .phase-transition {
+        #phase-audio {
             display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) scale(0.5);
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
-            font-size: 2.5rem;
-            padding: 30px 50px;
-            border-radius: 15px;
-            text-align: center;
-            z-index: 1000;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
-            opacity: 0;
-            transition: transform 0.5s ease, opacity 0.5s ease;
         }
-
-        .phase-transition.active {
-            display: block;
-            opacity: 1;
-            transform: translate(-50%, -50%) scale(1);
-        }
-        #phase-background {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: -1;
-    background-size: cover;
-    background-position: center;
-    transition: background-image 1s ease-in-out;
-    }
-
-    body.day #phase-background {
-        background-image: url('{{ url_for("static", filename="images/village.jpeg") }}');
-    }
-
-    body.voting #phase-background {
-        background-image: url('{{ url_for("static", filename="images/village.jpeg") }}');
-    }
-
-    body.night #phase-background {
-        background-image: url('{{ url_for("static", filename="images/forest.jpeg") }}');
-    }
-
     </style>
 </body>
 </html>

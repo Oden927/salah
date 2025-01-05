@@ -46,6 +46,7 @@
 
             </span>
         </p>
+        <!-- Liste des joueurs -->
         <div id="players-list">
             <h2>Liste des joueurs</h2>
             <ul>
@@ -56,6 +57,16 @@
                 {% endfor %}
             </ul>
         </div>
+        <div id="phase-timer-container">
+            <h2 id="phase-title">Phase actuelle : {{ game.current_phase | capitalize }}</h2>
+            <p id="phase-timer">Temps restant : 60 secondes</p>
+        </div>
+        
+                <!-- Conteneur pour les notifications -->
+        <div id="notification" class="notification" style="display: none;"></div>
+                       <!-- Conteneur pour les animations de transition -->
+        <div id="phase-transition" class="phase-transition"></div>
+        
         <div id="voting" style="display: none;">
             <h2>Votez pour éliminer un joueur</h2>
             <div id="voting-options">
@@ -71,18 +82,11 @@
         
         <p id="night-timer" style="display: none;">Temps restant pour la phase de nuit : 2:00</p>
 
-        <!-- Conteneur pour les notifications -->
-        <div id="notification" class="notification" style="display: none;"></div>
-
-        <!-- Conteneur pour les animations de transition -->
-        <div id="phase-transition" class="phase-transition"></div>
-
         <!-- Minuteur -->
         {% if player.eliminated %}
         <a href="{{ url_for('eliminated_page', game_id=game.id) }}" class="button">Aller à la salle des éliminés</a>
         {% endif %}
         
-        <p id="timer">Temps restant : 5:00</p>
         {% if not player.eliminated %}
         <div id="chat" class="chat-container">
             <h2>Discussion</h2>
@@ -149,7 +153,7 @@
             {% endif %}
         </div>
         {% endif %}
-        <button onclick="playAudioTest()">Tester l'audio</button>
+
         
         {% if player.role == 'Sorcière' and game.current_phase == 'night' %}
         <div id="sorceress-action">
@@ -218,20 +222,45 @@
         <p>Vous êtes éliminé et ne pouvez plus voter.</p>
         {% endif %}
         
-    <p id="phase">Phase actuelle : {{ game.current_phase }}</p>
 
     <script>
        const socket = io();
         const username = "{{ session['username'] }}";
         const room = "game_{{ game.id }}";
-        let timerInterval;
-
         // Join room
         socket.emit('join', { username: username, room: room });
+        // Timer et phases
+        let timer = 0;
+        let timerInterval;
 
-        let phaseChangeInProgress = false;
+        // Met à jour l'affichage du timer
+        function updateTimerDisplay(remainingTime) {
+            const timerElement = document.getElementById('phase-timer');
+            if (timerElement) {
+                const minutes = Math.floor(remainingTime / 60);
+                const seconds = remainingTime % 60;
+                timerElement.textContent = `Temps restant : ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+            }
+        }
 
- 
+        // Démarre le timer
+        function startTimer(initialTime) {
+            clearInterval(timerInterval); // Réinitialiser tout timer existant
+            timer = initialTime;
+
+            timerInterval = setInterval(() => {
+                if (timer > 0) {
+                    timer--;
+                    updateTimerDisplay(timer);
+                } else {
+                    clearInterval(timerInterval);
+                    alert("La phase est terminée !");
+                }
+            }, 1000);
+        }
+
+
+
         document.addEventListener('DOMContentLoaded', () => {
             const messagesDiv = document.getElementById('messages');
             const chatDisabledMessage = document.querySelector('#chat p');
@@ -245,6 +274,39 @@
             }
         });
 
+        function showPhaseTransition(message) {
+            const phaseTransition = document.getElementById('phase-transition');
+            if (phaseTransition) {
+                phaseTransition.textContent = message;
+                phaseTransition.classList.add('active');
+                setTimeout(() => {
+                    phaseTransition.classList.remove('active');
+                }, 3000);
+            }
+        }
+
+        // Met à jour la phase et démarre le timer
+        function updatePhaseAndTimer(phase, remainingTime) {
+            // Mettre à jour le titre de la phase
+            const phaseTitle = document.getElementById('phase-title');
+            if (phaseTitle) {
+                const phaseNames = {
+                    night: "🌙 Nuit",
+                    day: "☀️ Jour",
+                    voting: "🗳️ Vote"
+                };
+                phaseTitle.textContent = `Phase actuelle : ${phaseNames[phase] || "Inconnue"}`;
+            }
+
+            // Démarrer le timer
+            startTimer(remainingTime);
+
+            // Mettre à jour la classe du <body> pour changer le fond
+            const body = document.getElementById('game-body');
+            if (body) {
+                body.className = phase; // Appliquer la classe correspondante
+            }
+        }
 
 
 
@@ -503,60 +565,9 @@
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
 // ... (keep existing socket initialization code)
-        function updateTimerDisplay(remainingTime) {
-            const timerElement = document.getElementById('phase-timer');
-            if (timerElement) {
-                const minutes = Math.floor(remainingTime / 60);
-                const seconds = remainingTime % 60;
-                timerElement.textContent = `Temps restant : ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-            }
-        }
-        function startTimer(initialTime) {
-            clearInterval(timerInterval); // Réinitialiser tout timer existant
-            timer = initialTime;
 
-            timerInterval = setInterval(() => {
-                if (timer > 0) {
-                    timer--;
-                    updateTimerDisplay(timer);
-                } else {
-                    clearInterval(timerInterval);
-                    alert("La phase est terminée !");
-                }
-            }, 1000);
-        }
-        function showPhaseTransition(message) {
-            const phaseTransition = document.getElementById('phase-transition');
-            if (phaseTransition) {
-                phaseTransition.textContent = message;
-                phaseTransition.classList.add('active');
-                setTimeout(() => {
-                    phaseTransition.classList.remove('active');
-                }, 3000);
-            }
-        }
-               // Met à jour la phase et démarre le timer
-        function updatePhaseAndTimer(phase, remainingTime) {
-            // Mettre à jour le titre de la phase
-            const phaseTitle = document.getElementById('phase-title');
-            if (phaseTitle) {
-                const phaseNames = {
-                    night: "🌙 Nuit",
-                    day: "☀️ Jour",
-                    voting: "🗳️ Vote"
-                };
-                phaseTitle.textContent = `Phase actuelle : ${phaseNames[phase] || "Inconnue"}`;
-            }
 
-            // Démarrer le timer
-            startTimer(remainingTime);
-
-            // Mettre à jour la classe du <body> pour changer le fond
-            const body = document.getElementById('game-body');
-            if (body) {
-                body.className = phase; // Appliquer la classe correspondante
-            }
-        }
+        // Recevoir l'état initial de la partie
         socket.emit('get_game_state', { game_id: "{{ game.id }}" });
 
         socket.on('game_state', (data) => {
@@ -564,7 +575,58 @@
             updatePhaseAndTimer(data.current_phase, data.remaining_time);
             updateChatVisibility(data.current_phase, "{{ player.role }}");
         });
+        // Gérer les changements de phase
+        socket.on('phase_change', (data) => {
+            console.log("Changement de phase :", data.new_phase);
+            console.log("Joueurs actifs :", data.active_players);
 
+            updateChatVisibility(data.new_phase, "{{ player.role }}");
+            updatePhaseAndTimer(data.new_phase, data.remaining_time || 60);
+            showPhaseTransition(data.notification || "Nouvelle phase...");
+
+            const votingContainer = document.getElementById('voting-container');
+            const votingOptions = document.getElementById('voting-options');
+
+            if (data.new_phase === 'voting') {
+                votingOptions.innerHTML = ''; // Réinitialise les options précédentes
+                console.log("DEBUG: Joueurs actifs pour le vote :", data.active_players);
+
+                if (data.active_players && Array.isArray(data.active_players)) {
+                    data.active_players.forEach(player => {
+                        const button = document.createElement('button');
+                        button.textContent = `Voter pour ${player.username}`;
+                        button.className = 'vote-button';
+                        button.onclick = () => castVote(player.user_id, player.username);
+                        votingOptions.appendChild(button);
+                    });
+                } else {
+                    console.error("Erreur : Aucun joueur actif reçu.");
+                    alert("Erreur : Impossible d'afficher les options de vote.");
+                }
+
+                votingContainer.style.display = 'block';
+            } else {
+                votingContainer.style.display = 'none';
+            }
+        });
+
+        function updateTimer() {
+            if (timer > 0) {
+                timer--;
+                document.getElementById('timer').textContent = timer;
+            } else {
+                clearInterval(timerInterval);
+                alert("La phase est terminée !");
+            }
+        }
+            // Play phase change sound
+            updateAudio(data.new_phase);
+
+            // Show notification if provided
+            if (data.notification) {
+                showNotification(data.notification);
+            }
+        });
 
         // New function to handle UI updates
         function updateUIForPhase(phase) {
@@ -619,39 +681,6 @@
                     break;
             }
         }
-        socket.on('phase_change', (data) => {
-            console.log("Changement de phase :", data.new_phase);
-            console.log("Joueurs actifs :", data.active_players);
-
-            updateChatVisibility(data.new_phase, "{{ player.role }}");
-            updatePhaseAndTimer(data.new_phase, data.remaining_time || 60);
-            showPhaseTransition(data.notification || "Nouvelle phase...");
-
-            const votingContainer = document.getElementById('voting-container');
-            const votingOptions = document.getElementById('voting-options');
-
-            if (data.new_phase === 'voting') {
-                votingOptions.innerHTML = ''; // Réinitialise les options précédentes
-                console.log("DEBUG: Joueurs actifs pour le vote :", data.active_players);
-
-                if (data.active_players && Array.isArray(data.active_players)) {
-                    data.active_players.forEach(player => {
-                        const button = document.createElement('button');
-                        button.textContent = `Voter pour ${player.username}`;
-                        button.className = 'vote-button';
-                        button.onclick = () => castVote(player.user_id, player.username);
-                        votingOptions.appendChild(button);
-                    });
-                } else {
-                    console.error("Erreur : Aucun joueur actif reçu.");
-                    alert("Erreur : Impossible d'afficher les options de vote.");
-                }
-
-                votingContainer.style.display = 'block';
-            } else {
-                votingContainer.style.display = 'none';
-            }
-        });
 
         // Helper function to show notifications
         function showNotification(message) {
@@ -664,7 +693,7 @@
                 }, 3000);
             }
         }
-    });
+        
 
 // ... (keep the rest of your existing script code)
 
