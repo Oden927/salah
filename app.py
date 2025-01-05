@@ -130,14 +130,24 @@ def register():
 
         # Envoyer un email de confirmation
         try:
+            # Créez un message avec encodage explicite
             msg = Message(
-                subject="Bienvenue sur Loup-Garou".encode('utf-8').decode('utf-8'),
+                subject="Bienvenue sur Loup-Garou",  # Sujet avec des accents
                 recipients=[email],
-                charset="utf-8"  # Encodage explicite
+                sender="noreply.loupgarou@gmail.com",
+                charset="utf-8"  # Encodage UTF-8 explicite
             )
+
+            # Ajouter le corps HTML encodé en UTF-8
             msg.html = render_template('email/welcome.html', username=username)
-            mail.send(msg)
-            flash("Votre compte a été créé. Un email de confirmation a été envoyé !", "success")
+
+            try:
+                mail.send(msg)
+                flash("Votre compte a été créé. Un email de confirmation a été envoyé !", "success")
+            except Exception as e:
+                flash(f"Erreur lors de l'envoi de l'email : {e}", "danger")
+                print(f"Erreur complète : {repr(e)}")
+
         except Exception as e:
             flash("Votre compte a été créé, mais l'envoi de l'email a échoué.", "danger")
             print(f"Erreur d'envoi de l'email : {e}")
