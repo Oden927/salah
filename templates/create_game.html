@@ -6,6 +6,37 @@
     <title>Créer une partie</title>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script>
+        function validateRoles() {
+            const maxPlayers = parseInt(document.getElementById("max_players").value);
+            const numWerewolves = parseInt(document.getElementById("num_werewolves").value);
+            const numVillagers = parseInt(document.getElementById("num_villagers").value);
+            const numSpecialRoles = parseInt(document.getElementById("num_special_roles").value) || 0;
+
+            const totalRoles = numWerewolves + numVillagers + numSpecialRoles;
+
+            if (totalRoles > maxPlayers) {
+                alert("Le total des rôles dépasse le nombre maximum de joueurs !");
+                return false;
+            }
+
+            if (numWerewolves < 1 || numVillagers < 1) {
+                alert("Il doit y avoir au moins un Loup-Garou et un Villageois.");
+                return false;
+            }
+
+            return true;
+        }
+
+        function updateTotalRoles() {
+            const numWerewolves = parseInt(document.getElementById("num_werewolves").value) || 0;
+            const numVillagers = parseInt(document.getElementById("num_villagers").value) || 0;
+            const numSpecialRoles = parseInt(document.getElementById("num_special_roles").value) || 0;
+
+            const totalRoles = numWerewolves + numVillagers + numSpecialRoles;
+            document.getElementById("total-roles-display").textContent = `Total des rôles : ${totalRoles}`;
+        }
+    </script>
 </head>
 <body>
     <div class="content">
@@ -19,13 +50,13 @@
                 </div>
             {% endif %}
         {% endwith %}
-        <form method="POST" action="{{ url_for('create_game') }}">
+        <form method="POST" action="{{ url_for('create_game') }}" onsubmit="return validateRoles();">
             <h2>Informations de la Partie</h2>
             <label for="game_name">Nom de la Partie :</label>
             <input type="text" id="game_name" name="game_name" required>
         
             <label for="max_players">Nombre Maximum de Joueurs :</label>
-            <input type="number" id="max_players" name="max_players" min="2" required>
+            <input type="number" id="max_players" name="max_players" min="2" required oninput="updateTotalRoles();">
         
             <h2>Rôles Inclus</h2>
             <label>
@@ -33,15 +64,15 @@
                 Loup-Garou
             </label>
             <label>
-                <input type="checkbox" name="roles" value="Voyante" checked>
+                <input type="checkbox" name="roles" value="Voyante">
                 Voyante
             </label>
             <label>
-                <input type="checkbox" name="roles" value="Sorcière" checked>
+                <input type="checkbox" name="roles" value="Sorcière">
                 Sorcière
             </label>
             <label>
-                <input type="checkbox" name="roles" value="Cupidon" checked>
+                <input type="checkbox" name="roles" value="Cupidon">
                 Cupidon
             </label>
             <label>
@@ -51,21 +82,23 @@
         
             <h2>Nombre de Joueurs par Rôle</h2>
             <label for="num_werewolves">Loup-Garous :</label>
-            <input type="number" id="num_werewolves" name="num_werewolves" min="1" required>
+            <input type="number" id="num_werewolves" name="num_werewolves" min="1" required oninput="updateTotalRoles();">
         
             <label for="num_villagers">Villageois :</label>
-            <input type="number" id="num_villagers" name="num_villagers" min="1" required>
+            <input type="number" id="num_villagers" name="num_villagers" min="1" required oninput="updateTotalRoles();">
         
             <label for="num_special_roles">Rôles Spéciaux :</label>
-            <input type="number" id="num_special_roles" name="num_special_roles" min="1" required>
+            <input type="number" id="num_special_roles" name="num_special_roles" min="0" required oninput="updateTotalRoles();">
+
+            <p id="total-roles-display">Total des rôles : 0</p>
         
             <h2>Activer/Désactiver les Mécaniques</h2>
             <label>
-                <input type="checkbox" name="mechanics" value="amour" checked>
+                <input type="checkbox" name="mechanics" value="amour">
                 Activer la mécanique d'amour (Cupidon)
             </label>
             <label>
-                <input type="checkbox" name="mechanics" value="sorceress_powers" checked>
+                <input type="checkbox" name="mechanics" value="sorceress_powers">
                 Activer les pouvoirs de la Sorcière
             </label>
         

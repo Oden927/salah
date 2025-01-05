@@ -34,7 +34,8 @@ class Game(db.Model):
     phase_start_time = db.Column(db.DateTime, nullable=True)
     day_phase_duration = db.Column(db.Integer, default=300)
     night_phase_duration = db.Column(db.Integer, default=300)
-
+    config_roles = db.Column(db.JSON, nullable=True)  # Configuration des rôles
+    phase_duration = db.Column(db.Integer, default=60)  # Durée par défaut de chaque phase
   
     def get_remaining_time(self):
         if self.discussion_start_time:
@@ -92,44 +93,48 @@ class Player(db.Model):
 
 
 import random
-
-def assign_roles(players):
+def assign_roles(players, config_roles):
+    """
+    Assigner les rôles aux joueurs en respectant les conditions :
+    - Au moins un Loup-Garou et un Villageois.
+    - Distribution basée sur la configuration donnée.
+    - Rôles spéciaux attribués correctement.
+    """
     roles = []
 
-    # Toujours inclure au moins un Loup-Garou et un Villageois
-    roles.append('Loup-Garou')
-    roles.append('Villageois')
+    # Vérifier qu'il y a au moins un Loup-Garou et un Villageois
+    if config_roles.get('Loup-Garou', 0) < 1 or config_roles.get('Villageois', 0) < 1:
+        raise ValueError("Il doit y avoir au moins un Loup-Garou et un Villageois.")
 
-    num_players = len(players)
+    # Construire la liste des rôles basée sur la configuration
+    for role, count in config_roles.items():
+        roles.extend([role] * count)
 
-    # Calculer le nombre de rôles spéciaux selon le nombre de joueurs
-    num_werewolves = max(1, num_players // 4)  # 1 Loup-Garou pour 4 joueurs
-    num_seer = min(1, num_players - len(roles))  # Maximum 1 Voyante
-    num_sorceress = min(1, num_players - len(roles))  # Maximum 1 Sorcière
-    num_cupid = min(1, num_players - len(roles))  # Maximum 1 Cupidon
-    num_fool = min(1, num_players - len(roles))  # Maximum 1 Fou
-    num_villagers = num_players - len(roles) - num_werewolves - num_seer - num_sorceress - num_cupid - num_fool
+    # Vérifiez que le nombre de rôles n'excède pas le nombre de joueurs
+    if len(roles) > len(players):
+        raise ValueError("Le nombre de rôles dépasse le nombre de joueurs disponibles.")
 
-    # Ajouter les rôles restants
-    roles.extend(['Loup-Garou'] * num_werewolves)
-    roles.extend(['Voyante'] * num_seer)
-    roles.extend(['Sorcière'] * num_sorceress)
-    roles.extend(['Cupidon'] * num_cupid)
-    roles.extend(['Fou'] * num_fool)
-    roles.extend(['Villageois'] * num_villagers)
+    # Vérifiez qu'il y a assez de rôles pour les joueurs
+    if len(roles) < len(players):
+        # Ajouter des Villageois pour combler les joueurs restants
+        roles.extend(['Villageois'] * (len(players) - len(roles)))
 
-    # Mélanger les rôles pour les distribuer aléatoirement
+    # Mélanger les rôles pour une distribution aléatoire
     random.shuffle(roles)
 
     # Assigner les rôles aux joueurs
     for player, role in zip(players, roles):
         player.role = role
-        print(f"[DEBUG] {player.user.username} a reçu le rôle : {role}")  # Log pour vérification
+        print(f"[DEBUG] {player.user.username} a reçu le rôle : {role}")
 
+    # Vérifiez si les rôles ont été bien attribués
+    assigned_roles = {role: 0 for role in config_roles.keys()}
+    for player in players:
+        assigned_roles[player.role] += 1
 
+    print(f"[DEBUG] Distribution finale des rôles : {assigned_roles}")
 
-
-
+    return assigned_roles
 
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)

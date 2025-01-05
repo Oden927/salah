@@ -15,6 +15,18 @@
                 <li>{{ player.user.username }}</li>
             {% endfor %}
         </ul>
+        <p id="game-result">
+            {% if winner == 'Loups-Garous et Sorcière' %}
+                Félicitations aux <strong>Loups-Garous</strong> et à la <strong>Sorcière</strong> pour leur victoire !
+            {% elif winner == 'Gentils (Villageois et alliés)' %}
+                Félicitations aux <strong>Villageois</strong> et leurs alliés pour avoir éliminé tous les méchants !
+            {% elif winner == 'Fou' %}
+                <strong>Le Fou</strong> a triomphé en semant la zizanie et en étant éliminé pendant la phase de vote !
+            {% else %}
+                La partie s'est terminée sans vainqueur.
+            {% endif %}
+        </p>
+
 
         <div id="chat" class="chat-container">
             <h2>Chat des éliminés</h2>

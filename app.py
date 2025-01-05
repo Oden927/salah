@@ -32,11 +32,11 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # Configurer Flask-Mail
 app.config['MAIL_SERVER'] = 'smtp.sendgrid.net'
-app.config['MAIL_PORT'] = 587
+app.config['MAIL_PORT'] = 2525
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USERNAME'] = 'apikey'  # Nom d'utilisateur obligatoire pour SendGrid
 app.config['MAIL_PASSWORD'] = os.getenv('SENDGRID_API_KEY')
-app.config['MAIL_DEFAULT_SENDER'] = 'loupgarou92700@gmail.com'  # Expéditeur par défaut
+app.config['MAIL_DEFAULT_SENDER'] = 'noreply.loupgarou@gmail.com'  # Expéditeur par défaut
 # Configuration de la base de données
 if 'DATABASE_URL' in os.environ:
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DATABASE_URL']
@@ -130,7 +130,11 @@ def register():
 
         # Envoyer un email de confirmation
         try:
-            msg = Message("Bienvenue sur Loup-Garou", recipients=[email])
+            msg = Message(
+                subject="Bienvenue sur Loup-Garou".encode('utf-8').decode('utf-8'),
+                recipients=[email],
+                charset="utf-8"  # Encodage explicite
+            )
             msg.html = render_template('email/welcome.html', username=username)
             mail.send(msg)
             flash("Votre compte a été créé. Un email de confirmation a été envoyé !", "success")
@@ -181,9 +185,22 @@ def forgot():
 
             # Envoyer un email avec le lien de réinitialisation
             try:
-                msg = Message("Réinitialisation de votre mot de passe", recipients=[email])
-                msg.body = f"Bonjour {user.username},\n\nPour réinitialiser votre mot de passe, cliquez sur le lien suivant :\n{reset_link}\n\nCe lien expirera dans 1 heure.\n\nSi vous n'avez pas demandé cette action, veuillez ignorer cet email."
+                msg = Message(
+                    subject="Réinitialisation de votre mot de passe".encode('utf-8').decode('utf-8'),
+                    recipients=[email],
+                    charset="utf-8"
+                )
+                msg.body = f"""Bonjour {user.username},
+
+                Pour réinitialiser votre mot de passe, cliquez sur le lien suivant :
+                {reset_link}
+
+                Ce lien expirera dans 1 heure.
+
+                Si vous n'avez pas demandé cette action, veuillez ignorer cet email.
+                """.encode('utf-8').decode('utf-8')
                 mail.send(msg)
+
                 flash("Un email de réinitialisation a été envoyé !", "success")
             except Exception as e:
                 flash("Erreur lors de l'envoi de l'email. Veuillez réessayer.", "danger")
@@ -192,6 +209,7 @@ def forgot():
             flash("Aucun utilisateur trouvé avec cet email.", "danger")
 
     return render_template('forgot.html')
+
 
 
 
@@ -243,32 +261,84 @@ def create_game():
 
     if request.method == 'POST':
         game_name = request.form.get('game_name')
-        max_players = request.form.get('max_players')
+        max_players = int(request.form.get('max_players', 0))
+        num_werewolves = int(request.form.get('num_werewolves', 0))
+        num_villagers = int(request.form.get('num_villagers', 0))
+        num_seer = int(request.form.get('num_seer', 0))  # Voyante
+        num_sorceress = int(request.form.get('num_sorceress', 0))  # Sorcière
+        num_cupid = int(request.form.get('num_cupid', 0))  # Cupidon
+        num_fool = int(request.form.get('num_fool', 0))  # Fou
 
-        # Validez les entrées
-        if not game_name or not max_players.isdigit() or int(max_players) < 2:
-            flash("Veuillez entrer un nom de partie valide et un nombre de joueurs supérieur à 2.", "danger")
+        # Validation des rôles
+        if num_werewolves < 1 or num_villagers < 1:
+            flash("Il doit y avoir au moins un Loup-Garou et un Villageois.", "danger")
             return redirect(url_for('create_game'))
 
-        # Étape 1 : Créez la partie
+        # Configuration des rôles
+        config_roles = {
+            "Loup-Garou": num_werewolves,
+            "Villageois": num_villagers,
+            "Voyante": num_seer,
+            "Sorcière": num_sorceress,
+            "Cupidon": num_cupid,
+            "Fou": num_fool
+        }
+
+        # Créer la partie
         new_game = Game(
             name=game_name,
-            max_players=int(max_players),
+            max_players=max_players,
             created_by=session['user_id'],
             current_phase='waiting',
+            config_roles=config_roles
         )
         db.session.add(new_game)
-        db.session.commit()  # Sauvegarde pour générer l'ID de la partie
+        db.session.commit()
 
-        # Étape 2 : Ajoutez le créateur en tant que joueur
-        new_player = Player(user_id=session['user_id'], game_id=new_game.id, role='Hôte')
-        db.session.add(new_player)
-        db.session.commit()  # Sauvegarde pour enregistrer le joueur
+        # Ajouter le créateur en tant qu'hôte et joueur
+        host_player = Player(
+            user_id=session['user_id'],
+            game_id=new_game.id,
+            role='Hôte'  # Défini comme rôle d'hôte temporaire
+        )
+        db.session.add(host_player)
+        db.session.commit()
 
         flash(f"Partie '{game_name}' créée avec succès ! Vous êtes l'hôte.", "success")
         return redirect(url_for('waiting_room', game_id=new_game.id))
 
     return render_template('create_game.html')
+
+
+
+
+def get_time_remaining(game):
+    if not game.phase_start_time:
+        return game.phase_duration
+    elapsed_time = (datetime.utcnow() - game.phase_start_time).total_seconds()
+    remaining_time = max(0, game.phase_duration - elapsed_time)
+    return int(remaining_time)
+
+
+@socketio.on('get_game_state')
+def handle_get_game_state(data):
+    game_id = data.get('game_id')
+    game = Game.query.get(game_id)
+
+    if not game:
+        emit('error', {'message': "La partie n'existe pas."})
+        return
+
+    remaining_time = get_time_remaining(game)
+
+    emit('game_state', {
+        'current_phase': game.current_phase,
+        'remaining_time': remaining_time,
+        'players': [
+            {'username': p.user.username, 'eliminated': p.eliminated}
+            for p in game.players
+        ]
+    }, to=request.sid)
 
 
 from sqlalchemy.sql import func
@@ -391,6 +461,12 @@ def eliminate_player(game, player):
                 'lover': lover.user.username,
                 'reason': f"{player.user.username} a été éliminé(e)."
             }, room=f"game_{game.id}")
+        # Émettez un événement pour notifier les clients
+    socketio.emit('player_eliminated', {
+        'user_id': player.user_id,
+        'username': player.user.username
+    }, room=f"game_{game.id}")
+
 
 
 
@@ -406,6 +482,45 @@ def waiting_room(game_id):
     is_host = session.get('user_id') == (host.user_id if host else None)
 
     return render_template('waiting_room.html', game=game, players=players, is_host=is_host)
+
+@socketio.on('phase_end')
+def handle_phase_end(data):
+    room = data.get('room')
+    game_id = room.split('_')[1]
+    game = Game.query.get(game_id)
+
+    if not game:
+        emit('error', {'message': "La partie n'existe pas."})
+        return
+
+    # Déterminer la phase suivante et la notification associée
+    if game.current_phase == 'night':
+        game.current_phase = 'day'
+        notification = "☀️ La journée commence. Les joueurs discutent."
+    elif game.current_phase == 'day':
+        game.current_phase = 'voting'
+        notification = "🗳️ Phase de vote. Les joueurs doivent voter pour éliminer un suspect."
+    elif game.current_phase == 'voting':
+        game.current_phase = 'night'
+        notification = "🌙 La nuit tombe. Les Loups-Garous se réveillent."
+
+    # Mettre à jour l'heure de début de la nouvelle phase
+    game.phase_start_time = datetime.utcnow()
+    db.session.commit()
+
+    # Inclure la liste des joueurs actifs pour la phase de vote
+    active_players = [
+        {'user_id': p.user_id, 'username': p.user.username}
+        for p in game.players if not p.eliminated
+    ]
+
+    # Émettre l'événement de changement de phase avec une notification et les joueurs actifs
+    socketio.emit('phase_change', {
+        'game_id': game.id,
+        'new_phase': game.current_phase,
+        'notification': notification,
+        'active_players': active_players  # Ajouter les joueurs actifs
+    }, room=f"game_{game.id}")
 
 
 
@@ -540,9 +655,6 @@ def game_page(game_id):
     return render_template('game.html', game=game, players=players, roles=roles, player=current_player)
 
 
-
-votes = {}  # Dictionnaire pour stocker les votes
-
 def check_victory(game_id):
     game = Game.query.get(game_id)
     if not game:
@@ -552,7 +664,12 @@ def check_victory(game_id):
     eliminated_fool = Player.query.filter_by(game_id=game_id, role='Fou', eliminated=True).first()
     if eliminated_fool and game.current_phase == 'voting':
         print("DEBUG: Le Fou a gagné en étant éliminé pendant la phase de vote.")
-        return "Le Fou"
+        socketio.emit('game_over', {
+            'winner': "Fou",
+            'message': "Le Fou a été éliminé pendant la phase de vote et a gagné !",
+            'crazy_sound': "{{ url_for('static', filename='audio/crazy.mp3') }}"
+        }, room=f"game_{game_id}")
+        return "Fou"
 
     # Identifier les joueurs encore en vie
     active_players = Player.query.filter_by(game_id=game_id, eliminated=False).all()
@@ -560,18 +677,20 @@ def check_victory(game_id):
     # Identifier les rôles des méchants (Loups-Garous et Sorcière)
     evil_roles = ['Loup-Garou', 'Sorcière']
     evils = [player for player in active_players if player.role in evil_roles]
-    non_evils = [player for player in active_players if player.role not in evil_roles]
+    non_evils = [player for player in active_players if player.role not in evil_roles and player.role != 'Fou']
 
     print(f"DEBUG: Evils: {len(evils)}, Non-evils: {len(non_evils)}")
 
-    # Conditions de victoire
+    # Condition de victoire des méchants
     if len(evils) > 0 and len(non_evils) == 0:
         print("DEBUG: Méchants ont gagné")
         socketio.emit('wolves_win', {
-            'message': "Les Loups-Garous ont gagné la partie !",
-            'sound': "{{ url_for('static', filename='audio/werewolf.mp3') }}"
+            'message': "Les Loups-Garous et la Sorcière ont gagné la partie !",
+            'sound': "{{ url_for('static', filename='audio/werewolf_win.mp3') }}"
         }, room=f"game_{game_id}")
-        return "Loups-Garous"
+        return "Loups-Garous et Sorcière"
+
+    # Condition de victoire des gentils
     if len(evils) == 0:
         print("DEBUG: Gentils ont gagné")
         return "Gentils (Villageois et alliés)"
@@ -579,76 +698,6 @@ def check_victory(game_id):
     # Pas encore de victoire
     print("DEBUG: Pas de victoire")
     return None
-
-
-@socketio.on('vote')
-def handle_vote(data):
-    voted_user_id = data.get('votedUserId')  # ID du joueur voté
-    room = data.get('room')  # Salle actuelle (lié au jeu)
-
-    if not room or not voted_user_id:
-        emit('error', {'message': "Vote ou salle invalide."})
-        return
-
-    # Récupérer la partie associée
-    game_id = room.split('_')[1]
-    game = Game.query.get(game_id)
-
-    # Vérifiez que nous sommes en phase de vote
-    if game.current_phase != 'voting':
-        emit('error', {'message': "Les votes ne sont autorisés que pendant la phase de vote."})
-        return
-
-    # Initialisez les votes si nécessaire
-    if room not in votes:
-        votes[room] = {}
-
-    # Ajoutez ou mettez à jour le vote
-    votes[room][voted_user_id] = votes[room].get(voted_user_id, 0) + 1
-
-    # Vérifiez si tous les joueurs actifs ont voté
-    active_players = [player for player in game.players if not player.eliminated]
-    if len(votes[room]) == len(active_players):
-        # Trouvez le joueur avec le plus de votes
-        max_votes = max(votes[room].values())
-        tied_players = [user_id for user_id, count in votes[room].items() if count == max_votes]
-        eliminated_player_id = random.choice(tied_players)
-
-        # Marquer le joueur comme éliminé
-        eliminated_player = Player.query.filter_by(user_id=eliminated_player_id, game_id=game.id).first()
-        if eliminated_player:
-            eliminate_player(game, eliminated_player)
-
-            # Si le joueur éliminé est le Fou, il gagne
-            if eliminated_player.role == "Fou" and game.current_phase == "voting":
-                socketio.emit('fool_win', {
-                    'message': "Le Fou a été éliminé et a gagné la partie !",
-                    'crazy_sound': "{{ url_for('static', filename='audio/crazy.mp3') }}"
-                }, room=room)
-                return
-
-            # Notifiez tous les joueurs de l'élimination
-            socketio.emit('vote_result', {
-                'eliminatedPlayer': eliminated_player.user.username
-            }, room=room)
-
-        # Réinitialisez les votes
-        votes[room] = {}
-
-        # Passez à la phase suivante
-        transition_phase(game)
-
-        # Vérifiez les conditions de victoire après l'élimination
-        winner = check_victory(game_id)
-        if winner:
-            socketio.emit('game_over', {
-                'winner': winner,
-                'message': f"Les {winner} ont gagné la partie !"
-            }, room=room)
-            return
-
-
-
 
 
 from threading import Timer
@@ -703,17 +752,12 @@ def end_voting(game_id):
 
         socketio.emit('phase_change', {
             'game_id': game.id,
-            'new_phase': game.current_phase
-        }, room=room)
+            'new_phase': game.current_phase,
+        }, room=f"game_{game.id}")
 
 def schedule_phase_end(game):
     """Planifie la fin de la phase actuelle."""
-    phase_duration = (
-        game.night_phase_duration if game.current_phase == 'night' else
-        game.day_phase_duration if game.current_phase == 'day' else
-        120  # Durée fixe pour la phase de vote
-    )
-
+    phase_duration = 60
     # Réinitialiser le temps de début de phase
     game.phase_start_time = datetime.utcnow()
     db.session.commit()
@@ -748,14 +792,19 @@ def start_game(game_id):
     # Récupérer les joueurs de la partie
     players = Player.query.filter_by(game_id=game_id).all()
 
+    # Vérifier que la configuration des rôles existe
+    if not game.config_roles:
+        flash("La configuration des rôles est introuvable pour cette partie.", "danger")
+        return redirect(url_for('home'))
 
-    assign_roles(players)
+    # Assigner les rôles
+    assign_roles(players, game.config_roles)
     db.session.commit()
 
     # Démarrer la partie
     game.started = True
     game.current_phase = 'night'  # La phase commence par la nuit
-    game.discussion_start_time = datetime.utcnow()  # Enregistrez l'heure de début de la phase
+    game.phase_start_time = datetime.utcnow()  # Enregistrez l'heure de début de la phase
     db.session.commit()
 
     # Planifiez la fin de la phase de nuit
@@ -765,6 +814,7 @@ def start_game(game_id):
     socketio.emit('start_game', {'game_id': game_id}, to=f'game_{game_id}')
     flash("La partie a démarré !", "success")
     return redirect(url_for('game_page', game_id=game_id))
+
 
 
 
@@ -885,37 +935,54 @@ def game_timer(game_id):
 
 
 def transition_phase(game):
+    if game.current_phase == 'voting':
+        if game.id in votes:
+            votes[game.id] = {}  # Réinitialisez les votes
     with phase_lock:
         if not game:
             print("Erreur : La partie est introuvable.")
             return
 
-        print(f"Transition de phase pour la partie {game.id}. Phase actuelle : {game.current_phase}")
-
+        # Définir la prochaine phase
         if game.current_phase == 'night':
             game.current_phase = 'day'
             notification = "☀️ La journée commence. Les joueurs discutent."
         elif game.current_phase == 'day':
-            for player in game.players:
-                player.action_used = False
-            db.session.commit()
             game.current_phase = 'voting'
             notification = "🗳️ Phase de vote. Les joueurs doivent voter pour éliminer un suspect."
         elif game.current_phase == 'voting':
             game.current_phase = 'night'
             notification = "🌙 La nuit tombe. Les Loups-Garous se réveillent."
 
+        # Sauvegarder dans la base de données
         game.phase_start_time = datetime.utcnow()
         db.session.commit()
+        winner = check_victory(game.id)
+        if winner:
+            # Notifiez tous les joueurs de la fin de la partie
+            socketio.emit('game_over', {
+                'winner': winner,
+                'message': f"Les {winner} ont gagné la partie !"
+            }, room=f"game_{game.id}")
+
+            # Rediriger tous les joueurs vers une page d'élimination
+            socketio.emit('redirect_to_elimination', {
+                'message': f"Le jeu est terminé ! Les {winner} ont remporté la partie."
+            }, room=f"game_{game.id}")
+            return
 
         # Planifiez la prochaine phase
         schedule_phase_end(game)
 
+        # Émettez un événement Socket.IO
         socketio.emit('phase_change', {
             'game_id': game.id,
             'new_phase': game.current_phase,
             'notification': notification
         }, room=f"game_{game.id}")
+        
+
+        print(f"Transition de phase pour la partie {game.id}. Nouvelle phase : {game.current_phase}")
 
 
 
@@ -978,52 +1045,67 @@ def handle_werewolf_vote(data):
 
     if not game:
         print("DEBUG: La partie n'existe pas.")
-        emit('error', {'message': "La partie n'existe pas."})
+        emit('error', {'message': "La partie n'existe pas."}, to=request.sid)
         return
 
     if game.current_phase != 'night':
-        print(f"DEBUG: Phase actuelle: {game.current_phase}. Les votes sont uniquement autorisés pendant la nuit.")
-        emit('error', {'message': "Les votes des Loups-Garous ne sont autorisés que pendant la phase de nuit."})
+        print(f"DEBUG: Phase actuelle: {game.current_phase}. Les votes sont uniquement autorisés pendant la phase de nuit.")
+        emit('error', {'message': "Les votes des Loups-Garous ne sont autorisés que pendant la phase de nuit."}, to=request.sid)
         return
-    # Ajoutez le vote et passez automatiquement à la phase suivante si tous les votes sont terminés
-    werewolves = Player.query.filter_by(game_id=game.id, role='Loup-Garou', eliminated=False).all()
-    if len(votes[room]) >= len(werewolves):
-        transition_phase(game)  # Passez immédiatement à la phase suivante
-   
-    # Initialisation des votes
+
+    # Initialisation des votes si nécessaire
     if room not in votes:
         votes[room] = {}
-    print(f"DEBUG: Votes avant ajout: {votes[room]}")
 
-    # Ajouter le vote pour la victime
-    votes[room][victim_id] = votes[room].get(victim_id, 0) + 1
-    print(f"DEBUG: Votes après ajout: {votes[room]}")
+    # Vérifiez si le joueur a déjà voté
+    voter_id = session.get('user_id')
+    if voter_id in votes[room]:
+        emit('error', {'message': "Vous avez déjà voté."}, to=request.sid)
+        return
+
+    # Ajout du vote pour la victime
+    votes[room][voter_id] = victim_id
+    print(f"DEBUG: Votes actuels : {votes[room]}")
+
+    # Notifiez uniquement le joueur qui a voté
+    victim = Player.query.filter_by(user_id=victim_id, game_id=game.id).first()
+    if victim:
+        emit('notification', {
+            'message': f"Vous avez voté pour éliminer {victim.user.username}."
+        }, to=request.sid)
 
     # Vérifiez si tous les Loups-Garous actifs ont voté
     werewolves = Player.query.filter_by(game_id=game.id, role='Loup-Garou', eliminated=False).all()
-    print(f"DEBUG: Nombre de Loups-Garous actifs: {len(werewolves)}")
+    if len(votes[room]) == len(werewolves):
+        # Comptez les votes pour désigner la victime
+        vote_counts = {}
+        for _, vote in votes[room].items():
+            vote_counts[vote] = vote_counts.get(vote, 0) + 1
 
-    if len(votes[room]) >= len(werewolves):
-        max_votes = max(votes[room].values())
-        tied_players = [user_id for user_id, vote_count in votes[room].items() if vote_count == max_votes]
-        selected_victim_id = random.choice(tied_players)  # Gestion des égalités
+        # Trouvez la victime avec le plus de votes
+        max_votes = max(vote_counts.values())
+        tied_players = [user_id for user_id, count in vote_counts.items() if count == max_votes]
+        selected_victim_id = random.choice(tied_players)
 
+        # Éliminez la victime
         victim = Player.query.filter_by(user_id=selected_victim_id, game_id=game.id).first()
         if victim:
-            eliminate_player(game, victim)  # Gestion centralisée des éliminations
-            print(f"DEBUG: Victime éliminée: {victim.user.username}")
+            eliminate_player(game, victim)
+            print(f"DEBUG: Victime éliminée : {victim.user.username}")
 
-            # Notifiez tous les joueurs
+            # Notifiez tous les joueurs de l'élimination
             socketio.emit('player_eliminated', {
                 'eliminatedPlayer': victim.user.username,
                 'reason': "Les Loups-Garous ont décidé de l'éliminer."
             }, room=f"game_{game_id}")
 
-        # Réinitialiser les votes
+        # Réinitialisation des votes
         votes[room] = {}
 
-        # Passer à la phase suivante
+        # Transition à la phase suivante
         transition_phase(game)
+
+
 
 @app.route('/seer_action/<int:game_id>', methods=['POST'])
 def seer_action(game_id):
@@ -1085,6 +1167,89 @@ def handle_seer_action(data):
             'username': target_player.user.username,
             'role': target_player.role
         }, room=f'game_{game_id}')
+
+
+@app.route('/test_active_players/<int:game_id>')
+def test_active_players(game_id):
+    game = Game.query.get(game_id)
+    if not game:
+        return {"error": "Game not found"}, 404
+
+    active_players = [
+        {'user_id': p.user_id, 'username': p.user.username}
+        for p in game.players if not p.eliminated
+    ]
+
+    return {"game_id": game.id, "active_players": active_players}
+
+votes = {}  # Dictionnaire global pour stocker les votes par partie
+
+@socketio.on('vote')
+def handle_vote(data):
+    voted_user_id = data.get('votedUserId')  # ID du joueur voté
+    room = data.get('room')  # Salle actuelle (lié au jeu)
+
+    if not room or not voted_user_id:
+        emit('error', {'message': "Vote ou salle invalide."})
+        return
+
+    # Récupérer la partie associée
+    game_id = room.split('_')[1]
+    game = Game.query.get(game_id)
+
+    # Vérifiez que nous sommes en phase de vote
+    if game.current_phase != 'voting':
+        emit('error', {'message': "Les votes ne sont autorisés que pendant la phase de vote."})
+        return
+
+    # Initialisez les votes si nécessaire
+    if room not in votes:
+        votes[room] = {}
+
+    # Ajoutez ou mettez à jour le vote
+    votes[room][voted_user_id] = votes[room].get(voted_user_id, 0) + 1
+
+    # Vérifiez si tous les joueurs actifs ont voté
+    active_players = [player for player in game.players if not player.eliminated]
+    if len(votes[room]) == len(active_players):
+        # Trouvez le joueur avec le plus de votes
+        max_votes = max(votes[room].values())
+        tied_players = [user_id for user_id, count in votes[room].items() if count == max_votes]
+        eliminated_player_id = random.choice(tied_players)
+
+        # Marquer le joueur comme éliminé
+        eliminated_player = Player.query.filter_by(user_id=eliminated_player_id, game_id=game.id).first()
+        if eliminated_player:
+            eliminate_player(game, eliminated_player)
+
+            # Si le joueur éliminé est le Fou, il gagne
+            if eliminated_player.role == "Fou" and game.current_phase == "voting":
+                socketio.emit('fool_win', {
+                    'message': "Le Fou a été éliminé et a gagné la partie !",
+                    'crazy_sound': "{{ url_for('static', filename='audio/crazy.mp3') }}"
+                }, room=room)
+                return
+
+            # Notifiez tous les joueurs de l'élimination
+            socketio.emit('vote_result', {
+                'eliminatedPlayer': eliminated_player.user.username
+            }, room=room)
+
+        # Réinitialisez les votes
+        votes[room] = {}
+
+        # Passez à la phase suivante
+        transition_phase(game)
+
+        # Vérifiez les conditions de victoire après l'élimination
+        winner = check_victory(game_id)
+        if winner:
+            socketio.emit('game_over', {
+                'winner': winner,
+                'message': f"Les {winner} ont gagné la partie !"
+            }, room=room)
+            return
+
 
 
 @socketio.on('choose_victim')

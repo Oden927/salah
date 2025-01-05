@@ -10,7 +10,11 @@ body {
     color: #e5e5e5; /* Couleur claire du texte */
 }
 
-
+.player-item.eliminated {
+    text-decoration: line-through;
+    color: red;
+    opacity: 0.6;
+}
 /* Barre de navigation */
 .navbar {
     display: flex;
