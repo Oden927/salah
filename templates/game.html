@@ -263,6 +263,7 @@
                 }, 3000);
             }
         }
+        
         function showNotification(phase) {
             const phaseMessages = {
                 night: "🌙 Phase de Nuit",
@@ -415,7 +416,7 @@
 
             // Rediriger les joueurs vers la page d'accueil après 5 secondes
             setTimeout(() => {
-                window.location.href = "/home";
+                window.location.href = "/";
             }, 5000);
         });
 
@@ -524,7 +525,7 @@
 
         socket.on('game_over', (data) => {
             alert(data.message);
-            window.location.href = "/home"; // Redirection vers l'accueil après la fin du jeu
+            window.location.href = "/"; // Redirection vers l'accueil après la fin du jeu
         });
 
 
